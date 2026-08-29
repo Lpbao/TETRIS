@@ -1,0 +1,40 @@
+import type { AwardGroup } from "@/lib/site-content";
+import { cn } from "@/lib/utils";
+
+interface AwardsListProps {
+  title: string;
+  groups: readonly AwardGroup[];
+  className?: string;
+}
+
+export function AwardsList({ title, groups, className }: AwardsListProps) {
+  return (
+    <section className={cn("py-12", className)}>
+      <h2
+        data-section-title=""
+        className="text-sm font-bold uppercase tracking-[0.3em]"
+      >
+        <span data-scroll-blur="">{title}</span>
+      </h2>
+      <div data-section-body="" data-ml11-body="" className="mt-3 space-y-8">
+        {groups.map((group) => (
+          <div key={group.title} data-scroll-blur="">
+            <h3 className="text-sm font-semibold">{group.title}</h3>
+            <ul className="mt-2 space-y-2">
+              {group.items.map((item) => (
+                <li
+                  key={`${item.year}-${item.title}`}
+                  className="text-sm leading-relaxed text-muted-foreground"
+                >
+                  <span className="font-medium text-foreground">{item.year}</span>
+                  {" — "}
+                  {item.title}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

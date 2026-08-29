@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// CMS layout landing — một row / trang. `content` JSON theo slug:
+/// home: { slides: HeroSlide[] }
+/// about: siteAbout
+/// services: { items: SiteService[] }
+/// contact: { email, phone, address }
+/// projects: placeholder (list dự án = Post)
+/// @see docs/architecture/DECISIONS.md
+model SitePage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  sortOrder Int      @default(0)
+  posts     Post[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+}
+
+/// Bài đăng = dự án / portfolio (title, address, concept, category, description, images).
+/// content + excerpt: deprecated — form/API admin không ghi; giữ cột cho /blog.
+model Post {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  address     String    @default("")
+  concept     String    @default("")
+  description String    @default("") @db.Text
+  coverImage  String?
+  /// Gallery — map `SiteProject.gallery`
+  images      String[]  @default([])
+  published   Boolean   @default(false)
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  /// @deprecated — không dùng form/API admin; /blog còn đọc
+  content     String?   @db.Text
+  /// @deprecated — không dùng form/API admin; /blog còn đọc
+  excerpt     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([published, createdAt(sort: Desc)])
+  @@index([slug])
+  @@index([categoryId])
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  title     String   @default("")
+  path      String
+  url       String
+  mimeType  String
+  size      Int
+  type      String
+  createdAt DateTime @default(now())
+
+  @@index([type, createdAt(sort: Desc)])
+  @@index([title])
+}

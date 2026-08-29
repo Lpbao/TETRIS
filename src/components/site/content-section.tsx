@@ -1,0 +1,72 @@
+import {
+  MovingLetters,
+  MovingLettersPop,
+  MovingLettersScale,
+} from "@/components/site/moving-letters";
+import { cn } from "@/lib/utils";
+
+interface ContentSectionProps {
+  title: string;
+  paragraphs: readonly string[];
+  className?: string;
+  movingLetters?: boolean;
+  headingEffect?: "ml2";
+  bodyEffect?: "text-focus-in";
+  movingLettersSectionId?: string;
+  bodyClassName?: string;
+  scrollBlur?: boolean;
+}
+
+export function ContentSection({
+  title,
+  paragraphs,
+  className,
+  movingLetters = false,
+  headingEffect,
+  bodyEffect,
+  movingLettersSectionId,
+  bodyClassName,
+  scrollBlur = false,
+}: ContentSectionProps) {
+  const titleNode =
+    headingEffect === "ml2" && movingLettersSectionId ? (
+      <MovingLettersPop text={title} sectionId={movingLettersSectionId} />
+    ) : movingLetters ? (
+      <MovingLetters text={title} />
+    ) : (
+      title
+    );
+
+  return (
+    <section className={cn("py-12", className)}>
+      <h2
+        data-section-title=""
+        data-ml7-heading={movingLetters ? "" : undefined}
+        data-ml2-heading={headingEffect === "ml2" ? "" : undefined}
+        className="text-sm font-bold uppercase tracking-[0.3em]"
+      >
+        {scrollBlur ? <span data-scroll-blur="">{titleNode}</span> : titleNode}
+      </h2>
+      <div
+        data-section-body=""
+        data-ml9-body={movingLetters ? "" : undefined}
+        data-text-focus-in={bodyEffect === "text-focus-in" ? "" : undefined}
+        data-scroll-blur={scrollBlur ? "" : undefined}
+        className={cn("mt-6 space-y-4", bodyClassName)}
+      >
+        {paragraphs.map((paragraph) => (
+          <p
+            key={paragraph.slice(0, 40)}
+            className="text-sm leading-relaxed text-muted-foreground"
+          >
+            {movingLetters ? (
+              <MovingLettersScale text={paragraph} />
+            ) : (
+              paragraph
+            )}
+          </p>
+        ))}
+      </div>
+    </section>
+  );
+}
