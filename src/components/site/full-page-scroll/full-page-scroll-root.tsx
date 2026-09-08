@@ -39,6 +39,16 @@ export function FullPageScrollRoot({
   const { height: viewportHeight } = useViewportBelowHeader();
   const pager = useSectionPager(sections, { effect });
   const [slideReady, setSlideReady] = useState(false);
+  const [jsReady, setJsReady] = useState(false);
+
+  useEffect(() => {
+    setJsReady(true);
+    const win = window as unknown as { __siteFpsReact?: boolean };
+    win.__siteFpsReact = true;
+    return () => {
+      win.__siteFpsReact = false;
+    };
+  }, []);
 
   useSectionGesture({
     pager,
@@ -85,6 +95,7 @@ export function FullPageScrollRoot({
         data-fps-effect={effect}
         data-fps-footer={effect === "slide" ? pager.footerPhase : undefined}
         data-fps-slide-ready={effect === "slide" && slideReady ? "" : undefined}
+        data-fps-js={jsReady ? "" : undefined}
         className={cn(
           "relative w-full",
           pager.isTerminalReleased && "flex min-h-0 flex-1 flex-col",

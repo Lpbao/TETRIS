@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { getMediaTitles } from "@/lib/get-media-titles";
+import {
+  MEDIA_TITLE_CONFLICT_ERROR,
+  findDuplicateTitleConflicts,
+} from "@/lib/media-upload-titles";
 import { prisma } from "@/lib/prisma";
 import { mediaUploadSchema } from "@/lib/validations/media";
 
@@ -27,6 +32,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json(
         { error: "Validation failed", details: parsed.error.flatten() },
         { status: 400 },
+      );
+    }
+
+    const existingTitles = await getMediaTitles(id);
+    const conflicts = findDuplicateTitleConflicts(
+      [parsed.data.title],
+      existingTitles,
+    );
+    if (conflicts.length > 0) {
+      return NextResponse.json(
+        { error: MEDIA_TITLE_CONFLICT_ERROR, conflicts },
+        { status: 409 },
       );
     }
 

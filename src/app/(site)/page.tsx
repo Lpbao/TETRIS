@@ -1,7 +1,8 @@
 import { HeroCarousel } from "@/components/site/hero-carousel";
 import { HomeSectionPaging } from "@/components/site/home-section-paging";
-import { ProjectGrid } from "@/components/site/project-grid";
-import { getHomeProjects, siteHeroSlides } from "@/lib/site-content";
+import { ProjectShowcase } from "@/components/site/project-showcase";
+import { getHomeHeroSlides } from "@/lib/get-home-hero-slides";
+import { getHomeProjects } from "@/lib/get-home-projects";
 import { createPageMetadata } from "@/lib/site-metadata";
 
 export const metadata = createPageMetadata({
@@ -11,13 +12,19 @@ export const metadata = createPageMetadata({
   path: "/",
 });
 
-export default function HomePage() {
-  const projects = getHomeProjects(8);
+/** CMS slider đổi là thấy ngay — không cache trang chủ. */
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const [slides, projects] = await Promise.all([
+    getHomeHeroSlides(),
+    getHomeProjects(),
+  ]);
 
   return (
     <>
-      <HeroCarousel slides={siteHeroSlides} />
-      <ProjectGrid id="home-projects" projects={projects} variant="home" />
+      <HeroCarousel slides={slides} />
+      <ProjectShowcase id="home-projects" projects={projects} layout="home" />
       <HomeSectionPaging sectionId="home-projects" />
     </>
   );

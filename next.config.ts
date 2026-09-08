@@ -1,6 +1,44 @@
+import { networkInterfaces } from "os";
 import type { NextConfig } from "next";
 
+function lanDevOrigins() {
+  const origins = new Set<string>([
+    "*.trycloudflare.com",
+    "192.168.1.69",
+    "192.168.1.6",
+    "192.168.*",
+    "10.*",
+    "172.16.*",
+    "172.17.*",
+    "172.18.*",
+    "172.19.*",
+    "172.20.*",
+    "172.21.*",
+    "172.22.*",
+    "172.23.*",
+    "172.24.*",
+    "172.25.*",
+    "172.26.*",
+    "172.27.*",
+    "172.28.*",
+    "172.29.*",
+    "172.30.*",
+    "172.31.*",
+  ]);
+  for (const nets of Object.values(networkInterfaces())) {
+    for (const net of nets ?? []) {
+      /* Node đổi `family` giữa "IPv4" và 4 theo version */
+      const family = String(net.family);
+      const ipv4 = family === "IPv4" || family === "4";
+      if (ipv4 && !net.internal) origins.add(net.address);
+    }
+  }
+  return [...origins];
+}
+
 const nextConfig: NextConfig = {
+  // Cloudflare tunnel + LAN (cùng WiFi) — thiết bị khác truy cập next dev
+  allowedDevOrigins: lanDevOrigins(),
   images: {
     dangerouslyAllowSVG: true,
     contentDispositionType: "attachment",
@@ -15,6 +53,19 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
+  },
+  serverExternalPackages: ["sharp"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
+    // 0 = prefetch `/` (force-dynamic) ngay khi logo/nav visible → Safari loop GET /
+    staleTimes: {
+      dynamic: 30,
+      static: 300,
+    },
+    // Safari hay báo navigation transferSize=0 → Next reload document mãi (GET /)
+    reactDebugChannel: false,
   },
   async redirects() {
     return [

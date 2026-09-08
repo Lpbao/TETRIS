@@ -26,7 +26,6 @@ export function AboutHeroSection({
       ref={rootRef}
       data-morph-pin=""
       data-about-hero-morph=""
-      data-morph-pin-phase="image"
       className={cn("relative w-full bg-background", className)}
     >
       <div data-morph-pin-track="">

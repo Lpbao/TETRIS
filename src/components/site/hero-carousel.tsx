@@ -1,35 +1,51 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import type { HeroSlide } from "@/lib/site-content";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CarouselDots } from "@/components/site/carousel-dots";
+import { SiteImage } from "@/components/site/site-image";
 import {
-  HERO_REST_MAX_SCROLL_Y,
+  isHeroGestureActive,
   scrollToProjectsAnchor,
   SECTION_AXIS_LOCK_MIN,
-  SECTION_EXIT_SWIPE_MIN,
   SECTION_SWIPE_MIN,
 } from "@/lib/home-scroll";
+import type { HeroSlide } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 
 interface HeroCarouselProps {
   slides: HeroSlide[];
   className?: string;
-  /** Anchor id of the section below hero (mobile long-swipe scroll target) */
   projectsAnchorId?: string;
 }
 
-const MOBILE_QUERY = "(max-width: 767px)";
-const SWIPE_MIN = SECTION_SWIPE_MIN;
-const AXIS_LOCK_MIN = SECTION_AXIS_LOCK_MIN;
-const EXIT_SWIPE_MIN = SECTION_EXIT_SWIPE_MIN;
+const WHEEL_COOLDOWN_MS = 420;
+const DOT_SETTLE_FALLBACK_MS = 500;
 
-type TouchOrigin = {
-  x: number;
-  y: number;
-};
+function readDotSettleMs(root: HTMLElement | null) {
+  if (!root) return DOT_SETTLE_FALLBACK_MS;
+  const raw = getComputedStyle(root).getPropertyValue("--carousel-dot-settle-ms").trim();
+  if (raw.endsWith("ms")) return Number.parseFloat(raw) || DOT_SETTLE_FALLBACK_MS;
+  if (raw.endsWith("s")) return Number.parseFloat(raw) * 1000 || DOT_SETTLE_FALLBACK_MS;
+  return Number.parseFloat(raw) || DOT_SETTLE_FALLBACK_MS;
+}
 
-type SwipeAxis = "horizontal" | "vertical" | null;
+type Point = { x: number; y: number };
+
+function isControlTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    Boolean(target.closest("button, a, [data-hero-pager], [data-carousel-dots]"))
+  );
+}
+
+/** iOS fires mouseenter on touch and often never mouseleave — do not pause autoplay */
+function canHoverPauseAutoplay() {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches
+  );
+}
 
 export function HeroCarousel({
   slides,
@@ -37,280 +53,332 @@ export function HeroCarousel({
   projectsAnchorId = "home-projects",
 }: HeroCarouselProps) {
   const sectionRef = useRef<HTMLElement>(null);
-  const touchOriginRef = useRef<TouchOrigin | null>(null);
-  const swipeAxisRef = useRef<SwipeAxis>(null);
-  const isHeroActiveRef = useRef(true);
-  const suppressClickRef = useRef(false);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const originRef = useRef<Point | null>(null);
+  const axisRef = useRef<"horizontal" | "vertical" | null>(null);
+  const touchArmedRef = useRef(false);
+  const ignoreClickUntilRef = useRef(0);
+  const wheelLockRef = useRef(0);
+  const goToRef = useRef<(index: number) => void>(() => {});
+  const activeIndexRef = useRef(0);
+  const jumpingRef = useRef(false);
+  const jumpTimerRef = useRef(0);
+  const dotSettleTimerRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
+  const [dotIndex, setDotIndex] = useState(0);
   const [isHeroActive, setIsHeroActive] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
+  activeIndexRef.current = activeIndex;
+
+  const syncSlideWidth = useCallback(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+    section.style.setProperty("--hero-slide-w", `${section.clientWidth}px`);
+  }, []);
 
   const goTo = useCallback(
     (index: number) => {
       if (slides.length === 0) return;
-      setActiveIndex((index + slides.length) % slides.length);
+      const next = (index + slides.length) % slides.length;
+      const track = trackRef.current;
+      const slide = track?.querySelectorAll<HTMLElement>("[data-hero-slide]")[next];
+      setActiveIndex(next);
+      if (!track || !slide) return;
+
+      jumpingRef.current = true;
+      track.dataset.heroJumping = "";
+      window.clearTimeout(jumpTimerRef.current);
+      window.clearTimeout(dotSettleTimerRef.current);
+      const left = slide.offsetLeft;
+      track.scrollLeft = left;
+      requestAnimationFrame(() => {
+        track.scrollLeft = left;
+        jumpTimerRef.current = window.setTimeout(() => {
+          jumpingRef.current = false;
+          delete track.dataset.heroJumping;
+          window.clearTimeout(dotSettleTimerRef.current);
+          dotSettleTimerRef.current = window.setTimeout(() => {
+            setDotIndex(next);
+          }, readDotSettleMs(sectionRef.current));
+        }, 80);
+      });
     },
     [slides.length],
   );
-
-  const goNext = useCallback(() => goTo(activeIndex + 1), [activeIndex, goTo]);
-  const goPrev = useCallback(() => goTo(activeIndex - 1), [activeIndex, goTo]);
-
-  useEffect(() => {
-    const media = window.matchMedia(MOBILE_QUERY);
-    const sync = () => setIsMobile(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-
-  useEffect(() => {
-    isHeroActiveRef.current = isHeroActive;
-  }, [isHeroActive]);
+  goToRef.current = goTo;
 
   useEffect(() => {
     const sync = () => {
-      setIsHeroActive(window.scrollY <= HERO_REST_MAX_SCROLL_Y);
+      const active = isHeroGestureActive();
+      setIsHeroActive(active);
+      if (active && !canHoverPauseAutoplay()) setIsHovered(false);
     };
-
+    const onOrient = () => {
+      sync();
+      syncSlideWidth();
+    };
     sync();
+    syncSlideWidth();
+    const section = sectionRef.current;
+    const resize = section ? new ResizeObserver(syncSlideWidth) : null;
+    if (section && resize) resize.observe(section);
     window.addEventListener("scroll", sync, { passive: true });
     window.addEventListener("scrollend", sync, { passive: true });
+    window.addEventListener("pageshow", sync);
+    window.addEventListener("orientationchange", onOrient);
+    window.addEventListener("resize", syncSlideWidth);
+    document.addEventListener("visibilitychange", sync);
     return () => {
+      resize?.disconnect();
       window.removeEventListener("scroll", sync);
       window.removeEventListener("scrollend", sync);
+      window.removeEventListener("pageshow", sync);
+      window.removeEventListener("orientationchange", onOrient);
+      window.removeEventListener("resize", syncSlideWidth);
+      document.removeEventListener("visibilitychange", sync);
     };
+  }, [syncSlideWidth]);
+
+  useEffect(() => {
+    const clearHover = () => setIsHovered(false);
+    window.addEventListener("touchstart", clearHover, { passive: true });
+    return () => window.removeEventListener("touchstart", clearHover);
   }, []);
 
   useEffect(() => {
-    if (slides.length <= 1 || isHovered || !isHeroActive) return;
-    const timer = window.setInterval(goNext, 6000);
+    const track = trackRef.current;
+    if (!track) return;
+
+    const commitDotFromSlide = () => {
+      if (jumpingRef.current) return;
+      const width = track.clientWidth;
+      if (width <= 0) return;
+      const index = Math.min(
+        slides.length - 1,
+        Math.max(0, Math.round(track.scrollLeft / width)),
+      );
+      setActiveIndex(index);
+      setDotIndex(index);
+    };
+
+    const scheduleDotCommit = () => {
+      if (jumpingRef.current) return;
+      window.clearTimeout(dotSettleTimerRef.current);
+      dotSettleTimerRef.current = window.setTimeout(
+        commitDotFromSlide,
+        readDotSettleMs(sectionRef.current),
+      );
+    };
+
+    track.addEventListener("scroll", scheduleDotCommit, { passive: true });
+    track.addEventListener("scrollend", scheduleDotCommit);
+    return () => {
+      window.clearTimeout(dotSettleTimerRef.current);
+      track.removeEventListener("scroll", scheduleDotCommit);
+      track.removeEventListener("scrollend", scheduleDotCommit);
+    };
+  }, [slides.length]);
+
+  useEffect(() => {
+    if (slides.length <= 1 || !isHeroActive) return;
+    if (isHovered && canHoverPauseAutoplay()) return;
+    const timer = window.setInterval(() => {
+      goToRef.current(activeIndexRef.current + 1);
+    }, 6000);
     return () => window.clearInterval(timer);
-  }, [goNext, slides.length, isHovered, isHeroActive]);
-
-  const scrollToProjects = useCallback(() => {
-    scrollToProjectsAnchor(projectsAnchorId);
-  }, [projectsAnchorId]);
-
-  const resetTouch = useCallback(() => {
-    touchOriginRef.current = null;
-    swipeAxisRef.current = null;
-  }, []);
-
-  const handleHorizontalSwipe = useCallback(
-    (deltaX: number) => {
-      if (Math.abs(deltaX) < SWIPE_MIN) return;
-      if (deltaX < 0) goNext();
-      else goPrev();
-    },
-    [goNext, goPrev],
-  );
-
-  const handleTouchStart = (event: React.TouchEvent) => {
-    if (isMobile && !isHeroActive) return;
-
-    const touch = event.touches[0];
-    if (!touch) return;
-    touchOriginRef.current = { x: touch.clientX, y: touch.clientY };
-    swipeAxisRef.current = null;
-  };
-
-  const handleTouchEnd = (event: React.TouchEvent) => {
-    if (isMobile && !isHeroActive) {
-      resetTouch();
-      return;
-    }
-
-    const origin = touchOriginRef.current;
-    if (!origin) return;
-
-    const touch = event.changedTouches[0];
-    if (!touch) {
-      resetTouch();
-      return;
-    }
-
-    const deltaX = touch.clientX - origin.x;
-    const deltaY = touch.clientY - origin.y;
-    const absX = Math.abs(deltaX);
-    const absY = Math.abs(deltaY);
-    const axis =
-      swipeAxisRef.current ?? (absX >= absY ? "horizontal" : "vertical");
-    const isTap = absX < SWIPE_MIN && absY < SWIPE_MIN;
-
-    resetTouch();
-
-    if (isMobile && isHeroActive) {
-      suppressClickRef.current = true;
-
-      if (isTap) {
-        goNext();
-        return;
-      }
-
-      if (axis === "horizontal") {
-        handleHorizontalSwipe(deltaX);
-        return;
-      }
-
-      if (absY >= EXIT_SWIPE_MIN) {
-        scrollToProjects();
-        return;
-      }
-
-      if (absY >= SWIPE_MIN) {
-        if (deltaY < 0) goNext();
-        else goPrev();
-      }
-      return;
-    }
-
-    if (!isMobile && isHeroActive) {
-      if (isTap) {
-        goNext();
-        return;
-      }
-      handleHorizontalSwipe(deltaX);
-    }
-  };
-
-  const handleCarouselClick = () => {
-    if (!isHeroActive) return;
-
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
-    goNext();
-  };
+  }, [slides.length, isHovered, isHeroActive]);
 
   useEffect(() => {
-    if (!isMobile) return;
-
     const section = sectionRef.current;
     if (!section) return;
 
-    const onTouchMove = (event: TouchEvent) => {
-      if (!isHeroActiveRef.current) return;
+    const arm = (point: Point) => {
+      if (!isHeroGestureActive()) return false;
+      originRef.current = point;
+      axisRef.current = null;
+      return true;
+    };
 
-      const origin = touchOriginRef.current;
-      const touch = event.touches[0];
-      if (!origin || !touch) return;
+    const finish = (x: number, y: number) => {
+      const origin = originRef.current;
+      const axis = axisRef.current;
+      originRef.current = null;
+      axisRef.current = null;
+      touchArmedRef.current = false;
+      if (!origin) return;
 
-      const deltaX = touch.clientX - origin.x;
-      const deltaY = touch.clientY - origin.y;
+      const deltaX = x - origin.x;
+      const deltaY = y - origin.y;
       const absX = Math.abs(deltaX);
       const absY = Math.abs(deltaY);
+      const resolved = axis ?? (absX >= absY ? "horizontal" : "vertical");
+      const isTap = absX < SECTION_SWIPE_MIN && absY < SECTION_SWIPE_MIN;
 
-      if (
-        !swipeAxisRef.current &&
-        (absX >= AXIS_LOCK_MIN || absY >= AXIS_LOCK_MIN)
-      ) {
-        swipeAxisRef.current = absX >= absY ? "horizontal" : "vertical";
-      }
+      ignoreClickUntilRef.current = Date.now() + 400;
 
-      const axis = swipeAxisRef.current;
-      if (axis === "horizontal" || (axis === null && absX >= absY)) {
-        event.preventDefault();
+      if (isTap) {
+        goToRef.current(activeIndexRef.current + 1);
         return;
       }
 
-      if (axis === "vertical" && absY < EXIT_SWIPE_MIN) {
-        event.preventDefault();
+      if (resolved === "horizontal") {
+        return;
+      }
+
+      /* Vuốt lên (deltaY < 0) → xuống projects. Không chặn native scroll. */
+      if (deltaY < 0 && absY >= SECTION_SWIPE_MIN) {
+        scrollToProjectsAnchor(projectsAnchorId);
       }
     };
 
-    section.addEventListener("touchmove", onTouchMove, { passive: false });
-    return () => section.removeEventListener("touchmove", onTouchMove);
-  }, [isMobile]);
+    const lockAxis = (x: number, y: number) => {
+      const origin = originRef.current;
+      if (!origin) return;
+      const absX = Math.abs(x - origin.x);
+      const absY = Math.abs(y - origin.y);
+      if (!axisRef.current && (absX >= SECTION_AXIS_LOCK_MIN || absY >= SECTION_AXIS_LOCK_MIN)) {
+        axisRef.current = absX >= absY ? "horizontal" : "vertical";
+      }
+    };
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 1 || isControlTarget(event.target)) return;
+      const touch = event.touches[0];
+      if (!arm({ x: touch.clientX, y: touch.clientY })) return;
+      touchArmedRef.current = true;
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (!touchArmedRef.current || !originRef.current || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      lockAxis(touch.clientX, touch.clientY);
+    };
+
+    const onTouchEnd = (event: TouchEvent) => {
+      if (!touchArmedRef.current) return;
+      const touch = event.changedTouches[0];
+      finish(touch.clientX, touch.clientY);
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "touch" || isControlTarget(event.target)) return;
+      if (!arm({ x: event.clientX, y: event.clientY })) return;
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch" || !originRef.current) return;
+      lockAxis(event.clientX, event.clientY);
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      if (event.pointerType === "touch" || !originRef.current) return;
+      finish(event.clientX, event.clientY);
+    };
+
+    const onClick = (event: MouseEvent) => {
+      if (isControlTarget(event.target)) return;
+      if (Date.now() < ignoreClickUntilRef.current) {
+        event.preventDefault();
+        return;
+      }
+      if (!isHeroGestureActive()) return;
+      goToRef.current(activeIndexRef.current + 1);
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (!isHeroGestureActive()) return;
+      const absX = Math.abs(event.deltaX);
+      const absY = Math.abs(event.deltaY);
+      if (absX < 8 || absX < absY) return;
+      event.preventDefault();
+      const now = Date.now();
+      if (now < wheelLockRef.current) return;
+      wheelLockRef.current = now + WHEEL_COOLDOWN_MS;
+      if (event.deltaX > 0) goToRef.current(activeIndexRef.current + 1);
+      else goToRef.current(activeIndexRef.current - 1);
+    };
+
+    section.addEventListener("touchstart", onTouchStart, { passive: true });
+    section.addEventListener("touchmove", onTouchMove, { passive: true });
+    section.addEventListener("touchend", onTouchEnd);
+    section.addEventListener("touchcancel", onTouchEnd);
+    section.addEventListener("pointerdown", onPointerDown);
+    section.addEventListener("pointermove", onPointerMove, { passive: true });
+    section.addEventListener("pointerup", onPointerUp);
+    section.addEventListener("pointercancel", onPointerUp);
+    section.addEventListener("click", onClick);
+    section.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      section.removeEventListener("touchstart", onTouchStart);
+      section.removeEventListener("touchmove", onTouchMove);
+      section.removeEventListener("touchend", onTouchEnd);
+      section.removeEventListener("touchcancel", onTouchEnd);
+      section.removeEventListener("pointerdown", onPointerDown);
+      section.removeEventListener("pointermove", onPointerMove);
+      section.removeEventListener("pointerup", onPointerUp);
+      section.removeEventListener("pointercancel", onPointerUp);
+      section.removeEventListener("click", onClick);
+      section.removeEventListener("wheel", onWheel);
+    };
+  }, [projectsAnchorId]);
 
   if (slides.length === 0) return null;
-
-  const slide = slides[activeIndex];
 
   return (
     <section
       ref={sectionRef}
       id="hero-carousel"
-      className={cn(
-        "relative w-full overflow-hidden bg-[#231f20]",
-        "max-md:h-[100dvh] max-md:min-h-[100dvh] max-md:w-screen max-md:max-w-[100vw]",
-        isMobile &&
-          (isHeroActive
-            ? "max-md:touch-none max-md:overscroll-none"
-            : "max-md:touch-pan-y"),
-        className,
-      )}
+      data-home-section="slides"
+      data-hero-active={isHeroActive ? "" : undefined}
+      className={cn("relative w-full overflow-hidden bg-[#231f20]", className)}
       aria-roledescription="carousel"
-      aria-label="Dự án nổi bật"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={resetTouch}
+      aria-label="Ảnh nổi bật"
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse" && canHoverPauseAutoplay()) {
+          setIsHovered(true);
+        }
+      }}
+      onPointerLeave={() => setIsHovered(false)}
     >
-      <div className="relative h-full min-h-[72vh] w-full md:min-h-[80vh] md:max-h-[900px] max-md:min-h-0">
-        <button
-          type="button"
-          aria-label="Xem slide tiếp theo"
-          className={cn(
-            "absolute inset-0 z-[1] border-0 bg-transparent p-0",
-            isHeroActive
-              ? "cursor-pointer max-md:pointer-events-none"
-              : "pointer-events-none",
-          )}
-          onClick={handleCarouselClick}
-        />
+      <div ref={trackRef} data-hero-track>
         {slides.map((item, index) => (
-          <div
-            key={item.image}
-            className={cn(
-              "absolute inset-0 transition-opacity duration-700 ease-in-out",
-              index === activeIndex ? "opacity-100" : "opacity-0",
-            )}
-            aria-hidden={index !== activeIndex}
-          >
-            <Image
+          <div key={`${item.image}-${index}`} data-hero-slide aria-hidden={index !== activeIndex}>
+            <SiteImage
               src={item.image}
               alt={item.title}
               fill
               priority={index === 0}
-              className="object-cover"
+              draggable={false}
+              className="pointer-events-none object-cover"
               sizes="100vw"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/55" />
           </div>
         ))}
+      </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-center px-4 pb-10 pt-24 md:pb-12">
-          <div className="flex w-full max-w-6xl items-end justify-between gap-4 text-white">
-            <p className="text-[11px] font-medium uppercase tracking-[0.22em] md:text-xs">
-              {slide.title}
-            </p>
-            <p className="text-right text-[11px] uppercase tracking-[0.18em] text-white/90 md:text-xs">
-              {slide.location}
-            </p>
-          </div>
+      {slides.length > 1 ? (
+        <>
+          <button
+            type="button"
+            aria-label="Slide trước"
+            className="absolute top-1/2 left-3 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center text-white md:flex"
+            onClick={() => goTo(activeIndex - 1)}
+          >
+            <ChevronLeft className="size-8" strokeWidth={1.25} />
+          </button>
+          <button
+            type="button"
+            aria-label="Slide tiếp"
+            className="absolute top-1/2 right-3 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center text-white md:flex"
+            onClick={() => goTo(activeIndex + 1)}
+          >
+            <ChevronRight className="size-8" strokeWidth={1.25} />
+          </button>
+        </>
+      ) : null}
 
-          <div className="pointer-events-auto mt-6 flex items-center gap-2.5">
-            {slides.map((item, index) => (
-              <button
-                key={item.image}
-                type="button"
-                aria-label={`Slide ${index + 1}`}
-                aria-current={index === activeIndex}
-                onClick={() => goTo(index)}
-                className={cn(
-                  "rounded-full transition-all",
-                  index === activeIndex
-                    ? "h-1.5 w-1.5 bg-white"
-                    : "h-1.5 w-1.5 border border-white/70 bg-transparent hover:border-white",
-                )}
-              />
-            ))}
-          </div>
-        </div>
+      <div data-hero-caption data-hero-pager className="absolute inset-x-0 bottom-0 z-20 px-4">
+        <CarouselDots count={slides.length} activeIndex={dotIndex} onSelect={goTo} />
       </div>
     </section>
   );

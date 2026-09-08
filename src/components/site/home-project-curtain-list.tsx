@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SiteProject } from "@/lib/site-content";
-import { getHeaderOffset, isSectionGateOpen } from "@/lib/home-scroll";
+import {
+  getHeaderOffset,
+  isHomeProjectScrollGateOpen,
+} from "@/lib/home-scroll";
+import {
+  PROJECT_ENTER_FAILSAFE_MS,
+  readProjectEnterDelayMs,
+  waitUntilSiteLoadingIdle,
+} from "@/lib/wait-site-loading-idle";
 import { HomeProjectCurtainCard } from "@/components/site/home-project-curtain-card";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +26,7 @@ interface HomeProjectCurtainListProps {
   sectionId?: string;
   className?: string;
   cardVariant?: "default" | "home" | "gallery";
-  /** `anchor` = Home snap dưới menu; `immediate` = chỉ chờ card lộ đủ */
+  /** `anchor` = Home: lần đầu scrollY ≥ 50vh; `immediate` = chỉ chờ card lộ */
   gate?: "anchor" | "immediate";
 }
 
@@ -30,10 +38,12 @@ export function HomeProjectCurtainList({
   cardVariant = "home",
   gate = "anchor",
 }: HomeProjectCurtainListProps) {
+  const listRef = useRef<HTMLUListElement>(null);
   const sectionReadyRef = useRef(false);
   const [sectionReady, setSectionReady] = useState(false);
   const [headerOffset, setHeaderOffset] = useState(64);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [enterTogether, setEnterTogether] = useState(false);
 
   const latchSection = useCallback(() => {
     if (sectionReadyRef.current) return;
@@ -45,9 +55,35 @@ export function HomeProjectCurtainList({
     const reduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
+    const touchUi =
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 767px)").matches;
     setReduceMotion(reduced);
     setHeaderOffset(getHeaderOffset());
-  }, []);
+    if (reduced || touchUi) {
+      setEnterTogether(true);
+      latchSection();
+    }
+  }, [gate, latchSection]);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const list = listRef.current;
+    let timer = 0;
+    const stopWait = waitUntilSiteLoadingIdle(() => {
+      const delay = readProjectEnterDelayMs(list);
+      timer = window.setTimeout(() => setEnterTogether(true), delay);
+    });
+    const failsafe = window.setTimeout(
+      () => setEnterTogether(true),
+      PROJECT_ENTER_FAILSAFE_MS,
+    );
+    return () => {
+      stopWait();
+      window.clearTimeout(timer);
+      window.clearTimeout(failsafe);
+    };
+  }, [reduceMotion]);
 
   useEffect(() => {
     const syncOffset = () => setHeaderOffset(getHeaderOffset());
@@ -64,48 +100,59 @@ export function HomeProjectCurtainList({
       return () => window.removeEventListener("resize", syncOffset);
     }
 
-    const section = document.getElementById(sectionId);
-    if (!section) return;
+    const section =
+      document.getElementById(sectionId) ??
+      listRef.current?.closest("section");
 
-    const sync = () => {
+    const tryLatch = () => {
       syncOffset();
-      if (isSectionGateOpen(section)) {
-        latchSection();
-      }
+      if (isHomeProjectScrollGateOpen(section)) latchSection();
     };
 
-    sync();
-    window.addEventListener("scroll", sync, { passive: true });
-    window.addEventListener("resize", sync, { passive: true });
-    window.addEventListener("scrollend", sync, { passive: true });
+    tryLatch();
+    window.addEventListener("scroll", tryLatch, { passive: true });
+    window.addEventListener("scrollend", tryLatch, { passive: true });
+    window.addEventListener("resize", tryLatch, { passive: true });
+    window.visualViewport?.addEventListener("resize", tryLatch);
+    window.visualViewport?.addEventListener("scroll", tryLatch);
 
     return () => {
-      window.removeEventListener("scroll", sync);
-      window.removeEventListener("resize", sync);
-      window.removeEventListener("scrollend", sync);
+      window.removeEventListener("scroll", tryLatch);
+      window.removeEventListener("scrollend", tryLatch);
+      window.removeEventListener("resize", tryLatch);
+      window.visualViewport?.removeEventListener("resize", tryLatch);
+      window.visualViewport?.removeEventListener("scroll", tryLatch);
     };
   }, [sectionId, reduceMotion, latchSection, gate]);
 
   return (
     <ul
+      ref={listRef}
+      data-project-cover=""
       className={cn(
         "grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-10 lg:grid-cols-4",
         className,
       )}
     >
-      {(items ?? projects.map((project) => ({ key: project.slug, project }))).map(
-        (item) => (
+      {(
+        items ??
+        projects.map<ProjectCurtainItem>((project) => ({
+          key: project.slug,
+          project,
+        }))
+      ).map((item) => (
           <HomeProjectCurtainCard
             key={item.key}
             project={item.project}
             image={item.image}
             variant={cardVariant}
+            gate={gate}
+            enterTogether={enterTogether}
             sectionReady={sectionReady}
             headerOffset={headerOffset}
             reduceMotion={reduceMotion}
           />
-        ),
-      )}
+        ))}
     </ul>
   );
 }

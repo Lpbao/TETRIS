@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import { FPS_INNER_SCROLL_EDGE_PX } from "@/lib/full-page-scroll/constants";
 import { useFullPageScroll } from "@/lib/full-page-scroll/context";
 
 function readCssNumber(
@@ -21,6 +22,19 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function isScrollerAtBottom(scroller: HTMLElement): boolean {
+  const { scrollTop, scrollHeight, clientHeight } = scroller;
+  const maxScrollTop = scrollHeight - clientHeight;
+  if (maxScrollTop <= FPS_INNER_SCROLL_EDGE_PX) return true;
+  return scrollTop >= maxScrollTop - FPS_INNER_SCROLL_EDGE_PX;
+}
+
+function clearBlur(nodes: NodeListOf<HTMLElement>) {
+  nodes.forEach((node) => {
+    node.style.setProperty("--about-scroll-blur-p", "1");
+  });
+}
+
 /** 0 = max blur (dưới màn), 1 = nét (đã vào vùng `--about-scroll-blur-to`). */
 export function useScrollYBlur(sectionId: string) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -37,14 +51,49 @@ export function useScrollYBlur(sectionId: string) {
     if (!(scroller instanceof HTMLElement)) return;
 
     let frame = 0;
+    let settleTimer = 0;
+
+    const setSettled = (settled: boolean) => {
+      if (settled) root.setAttribute("data-scroll-blur-settled", "");
+      else root.removeAttribute("data-scroll-blur-settled");
+    };
+
+    const cancelSettle = () => {
+      if (settleTimer) {
+        window.clearTimeout(settleTimer);
+        settleTimer = 0;
+      }
+    };
 
     const sync = () => {
       const nodes = root.querySelectorAll<HTMLElement>("[data-scroll-blur]");
       if (prefersReducedMotion()) {
-        nodes.forEach((node) => {
-          node.style.setProperty("--about-scroll-blur-p", "1");
-        });
+        cancelSettle();
+        setSettled(true);
+        clearBlur(nodes);
         return;
+      }
+
+      const atBottom = isScrollerAtBottom(scroller);
+
+      if (atBottom) {
+        if (root.hasAttribute("data-scroll-blur-settled")) {
+          clearBlur(nodes);
+          return;
+        }
+        if (!settleTimer) {
+          const delay = readCssNumber(root, "--about-scroll-blur-settle-ms", 200);
+          settleTimer = window.setTimeout(() => {
+            settleTimer = 0;
+            if (!isScrollerAtBottom(scroller)) return;
+            setSettled(true);
+            clearBlur(root.querySelectorAll<HTMLElement>("[data-scroll-blur]"));
+          }, delay);
+        }
+        /* Vẫn sync blur bình thường trong lúc chờ settle */
+      } else {
+        cancelSettle();
+        setSettled(false);
       }
 
       const clip = scroller.getBoundingClientRect();
@@ -74,7 +123,13 @@ export function useScrollYBlur(sectionId: string) {
     };
 
     sync();
-    if (!enabled) return;
+    if (!enabled) {
+      return () => {
+        cancelSettle();
+        setSettled(false);
+        if (frame) cancelAnimationFrame(frame);
+      };
+    }
 
     scroller.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
@@ -83,6 +138,8 @@ export function useScrollYBlur(sectionId: string) {
     observer.observe(root);
 
     return () => {
+      cancelSettle();
+      setSettled(false);
       scroller.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       observer.disconnect();

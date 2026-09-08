@@ -14,6 +14,7 @@ interface PartnersRowProps {
   headingEffect?: "ml2";
   logoEffect?: "text-focus-in";
   lettersSectionId?: string;
+  forceLettersPlay?: boolean;
 }
 
 export function PartnersRow({
@@ -23,16 +24,21 @@ export function PartnersRow({
   headingEffect,
   logoEffect,
   lettersSectionId = "about-brand-break",
+  forceLettersPlay = false,
 }: PartnersRowProps) {
   return (
     <section className={cn("py-12 pb-16", className)}>
       <h2
         data-section-title=""
         data-ml2-heading={headingEffect === "ml2" ? "" : undefined}
-        className="text-center text-sm font-bold uppercase tracking-[0.3em]"
+        className="text-center text-sm font-bold uppercase"
       >
         {headingEffect === "ml2" ? (
-          <MovingLettersPop text={title} sectionId={lettersSectionId} />
+          <MovingLettersPop
+            text={title}
+            sectionId={lettersSectionId}
+            forcePlay={forceLettersPlay}
+          />
         ) : (
           title
         )}

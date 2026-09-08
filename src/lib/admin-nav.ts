@@ -22,11 +22,11 @@ export const ADMIN_LAYOUT_PAGES: Record<
   },
   services: {
     label: "Dịch vụ",
-    description: "Các khối nội dung siteServices",
+    description: "Khối dịch vụ — title, mô tả, ảnh",
   },
   contact: {
     label: "Liên hệ",
-    description: "Email, số điện thoại, địa chỉ",
+    description: "Email, SĐT, địa chỉ chi tiết + tỉnh/TP Việt Nam",
   },
 };
 

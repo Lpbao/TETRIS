@@ -10,12 +10,10 @@ import {
   type FullPageScrollSection,
 } from "@/components/site/full-page-scroll";
 import { ABOUT_SECTIONS } from "@/lib/about-section-config";
-import { siteAbout } from "@/lib/site-content";
-
-type SiteAbout = typeof siteAbout;
+import type { AboutPageContent } from "@/lib/validations/site-page";
 
 interface AboutPageScrollProps {
-  content: SiteAbout;
+  content: AboutPageContent;
 }
 
 export function AboutPageScroll({ content }: AboutPageScrollProps) {

@@ -19,6 +19,18 @@ interface ServiceSectionProps {
   className?: string;
 }
 
+/** Không để opacity:0 mãi nếu enter-once / animation kẹt (hay gặp trên phone). */
+const PLAY_FAILSAFE_MS = 1200;
+
+function shouldSkipEnterAnimation(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 767px)").matches
+  );
+}
+
 export function ServiceSection({
   title,
   description,
@@ -34,7 +46,18 @@ export function ServiceSection({
   const [play, setPlay] = useState(false);
 
   useEffect(() => {
-    if (entered !== "in" || play) return;
+    if (play) return;
+
+    if (shouldSkipEnterAnimation()) {
+      setPlay(true);
+      return;
+    }
+
+    const failsafe = window.setTimeout(() => setPlay(true), PLAY_FAILSAFE_MS);
+
+    if (entered !== "in") {
+      return () => window.clearTimeout(failsafe);
+    }
 
     let inner = 0;
     const outer = requestAnimationFrame(() => {
@@ -44,6 +67,7 @@ export function ServiceSection({
     return () => {
       cancelAnimationFrame(outer);
       cancelAnimationFrame(inner);
+      window.clearTimeout(failsafe);
     };
   }, [entered, play]);
 
@@ -82,7 +106,10 @@ export function ServiceSection({
         </div>
 
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-[0.25em] md:text-base">
+          <h2
+            data-service-title=""
+            className="text-sm font-bold uppercase md:text-base"
+          >
             {title}
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:mt-6">

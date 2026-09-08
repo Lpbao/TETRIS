@@ -7,6 +7,7 @@ import {
   FPS_WHEEL_NOTCH_MIN,
 } from "@/lib/full-page-scroll/constants";
 import {
+  attachHomeEnterScrollReset,
   createHomeScrollSession,
   getHomeRestState,
   isAtHomeContentEnd,
@@ -60,6 +61,8 @@ export function SectionPaging({
   const footerCooldownUntilRef = useRef(0);
   const footerTouchOriginRef = useRef<TouchOrigin | null>(null);
   const footerSwipeAxisRef = useRef<SwipeAxis>(null);
+
+  useEffect(() => attachHomeEnterScrollReset(), []);
 
   useEffect(() => {
     if (!document.getElementById(heroId)) return;
@@ -285,9 +288,9 @@ export function SectionPaging({
         return;
       }
 
-      // Grid sâu + hết nội dung: vuốt tiếp hướng cuộn xuống (finger lên) → footer.
-      // Tại B, finger lên vẫn về hero.
-      if (!wasAnchorB) {
+      // Vuốt tiếp hướng cuộn xuống (finger lên): đáy grid / grid-deep → footer.
+      // Tại B (đầu lưới) finger lên vẫn về hero.
+      if (!wasAnchorB || isAtHomeContentEnd()) {
         openHomeFooter();
         return;
       }

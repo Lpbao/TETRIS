@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { GripVertical, Loader2 } from "lucide-react";
 import { buildMediaMarkdown, type MediaItem } from "@/lib/media";
 import { useMediaDrawer } from "@/components/admin/media-drawer-context";
+import { useMediaInfiniteList } from "@/hooks/use-media-infinite-list";
 
 interface MediaDragPanelProps {
   onInsert: (markdown: string) => void;
@@ -11,25 +12,21 @@ interface MediaDragPanelProps {
 
 export function MediaDragPanel({ onInsert }: MediaDragPanelProps) {
   const { openMedia } = useMediaDrawer();
-  const [media, setMedia] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchMedia = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/media");
-      if (res.ok) setMedia(await res.json());
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    media,
+    hasMore,
+    loading,
+    loadingMore,
+    reload,
+    listRef,
+    sentinelRef,
+  } = useMediaInfiniteList({ enabled: true });
 
   useEffect(() => {
-    fetchMedia();
-    const refresh = () => void fetchMedia();
+    const refresh = () => void reload();
     window.addEventListener("admin-media-changed", refresh);
     return () => window.removeEventListener("admin-media-changed", refresh);
-  }, [fetchMedia]);
+  }, [reload]);
 
   const getMarkdown = (item: MediaItem) =>
     buildMediaMarkdown(item.type, item.url, item.filename);
@@ -41,7 +38,7 @@ export function MediaDragPanel({ onInsert }: MediaDragPanelProps) {
     e.dataTransfer.effectAllowed = "copy";
   };
 
-  if (loading) {
+  if (loading && media.length === 0) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center rounded-lg border bg-muted/30">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -58,7 +55,7 @@ export function MediaDragPanel({ onInsert }: MediaDragPanelProps) {
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div ref={listRef} className="flex-1 overflow-y-auto p-2">
         {media.length === 0 ? (
           <div className="px-2 py-6 text-center">
             <p className="text-xs text-muted-foreground">
@@ -106,6 +103,20 @@ export function MediaDragPanel({ onInsert }: MediaDragPanelProps) {
                 </p>
               </div>
             ))}
+            {hasMore ? (
+              <div
+                ref={sentinelRef}
+                className="flex items-center justify-center py-2"
+              >
+                {loadingMore ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    Cuộn để tải thêm
+                  </span>
+                )}
+              </div>
+            ) : null}
           </div>
         )}
       </div>

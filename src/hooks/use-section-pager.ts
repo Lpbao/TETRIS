@@ -190,9 +190,12 @@ export function useSectionPager(
   ]);
 
   const canGoPrev = useCallback(() => {
-    if (isTransitioning || cooldownRef.current) return false;
+    if (isTransitioning) return false;
 
-    if (footerPhase === "open") return true;
+    /* Footer đang hiện: luôn cho đóng — không bị cooldown sau openFooter chặn (phone). */
+    if (footerPhase === "open" || footerPhase === "opening") return true;
+
+    if (cooldownRef.current) return false;
 
     if (isTerminalReleased && currentIndex === lastIndex) {
       if (isAtTerminalPageTop(currentIndex) && currentIndex > 0) {
@@ -296,8 +299,8 @@ export function useSectionPager(
   }, [beginCooldown, footerPhase, isTransitioning, transitionMs]);
 
   const closeFooter = useCallback((): boolean => {
-    if (isTransitioning || cooldownRef.current) return false;
-    if (footerPhase !== "open") return false;
+    if (isTransitioning) return false;
+    if (footerPhase !== "open" && footerPhase !== "opening") return false;
 
     beginCooldown();
     if (transitionMs === 0) {
@@ -378,11 +381,13 @@ export function useSectionPager(
   }, [beginCooldown, isTerminalReleased, isTransitioning]);
 
   const goPrev = useCallback((): boolean => {
-    if (isTransitioning || cooldownRef.current) return false;
+    if (isTransitioning) return false;
 
-    if (footerPhase === "open") {
+    if (footerPhase === "open" || footerPhase === "opening") {
       return closeFooter();
     }
+
+    if (cooldownRef.current) return false;
 
     if (isTerminalReleased && currentIndex === lastIndex) {
       if (isAtTerminalPageTop(currentIndex) && currentIndex > 0) {

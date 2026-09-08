@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isVnProvince } from "@/lib/vn-provinces";
 import { mediaPathSchema } from "@/lib/validations/shared";
 
 export const SITE_PAGE_SLUGS = [
@@ -77,9 +78,24 @@ export const servicesPageSchema = z.object({
   items: z.array(siteServiceSchema).min(1, "Cần ít nhất một dịch vụ"),
 });
 
-export const contactPageSchema = z.object({
+const vnProvinceField = z
+  .string()
+  .min(1, "Chọn tỉnh / thành phố")
+  .refine((v) => isVnProvince(v), "Tỉnh / thành phố không hợp lệ");
+
+/** Form admin — chưa ghép `address` (ghép lúc submit). */
+export const contactPageFormSchema = z.object({
   email: z.email("Email không hợp lệ"),
   phone: z.string().min(1, "Số điện thoại không được để trống").max(50),
+  addressLine: z
+    .string()
+    .min(1, "Địa chỉ chi tiết không được để trống")
+    .max(400, "Địa chỉ chi tiết tối đa 400 ký tự"),
+  province: vnProvinceField,
+});
+
+/** Lưu DB + public — có `address` đã ghép (line + tỉnh + Việt Nam). */
+export const contactPageSchema = contactPageFormSchema.extend({
   address: z.string().min(1, "Địa chỉ không được để trống").max(500),
 });
 
@@ -101,7 +117,26 @@ export function parseSitePageContent(slug: SitePageSlug, content: unknown) {
 }
 
 export type HomePageContent = z.infer<typeof homePageSchema>;
+/** Form admin Home — slides có thể rỗng trước khi lưu. */
+export type HomePageFormValues = {
+  slides: Array<{
+    image: string;
+    title: string;
+    location: string;
+    href: string;
+  }>;
+};
 export type AboutPageContent = z.infer<typeof aboutPageSchema>;
 export type ServicesPageContent = z.infer<typeof servicesPageSchema>;
+/** Form admin Services — items có thể rỗng trước khi lưu. */
+export type ServicesPageFormValues = {
+  items: Array<{
+    title: string;
+    description: string;
+    image: string;
+    imageAlt: string;
+  }>;
+};
+export type ContactPageFormValues = z.infer<typeof contactPageFormSchema>;
 export type ContactPageContent = z.infer<typeof contactPageSchema>;
 export type ProjectsPageContent = z.infer<typeof projectsPageSchema>;

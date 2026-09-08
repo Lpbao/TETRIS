@@ -21,13 +21,33 @@ const IMAGE_TYPES = [
 
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
+const OPTIMIZABLE_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
+
+/** File gốc raster — server nén WebP trước khi lưu. */
+export const MAX_IMAGE_UPLOAD_SIZE = 50 * 1024 * 1024;
+/** SVG / file sau nén. */
+export const MAX_IMAGE_STORED_SIZE = 10 * 1024 * 1024;
+export const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+
+function formatMb(bytes: number) {
+  return String(bytes / (1024 * 1024));
+}
 
 export function getMediaType(mimeType: string): MediaType | null {
   if (IMAGE_TYPES.includes(mimeType)) return "image";
   if (VIDEO_TYPES.includes(mimeType)) return "video";
   return null;
+}
+
+export function maxUploadBytes(mimeType: string, type: MediaType) {
+  if (type === "video") return MAX_VIDEO_SIZE;
+  if (OPTIMIZABLE_IMAGE_TYPES.has(mimeType)) return MAX_IMAGE_UPLOAD_SIZE;
+  return MAX_IMAGE_STORED_SIZE;
 }
 
 export function validateMediaFile(file: File) {
@@ -39,12 +59,12 @@ export function validateMediaFile(file: File) {
     };
   }
 
-  const maxSize = type === "image" ? MAX_IMAGE_SIZE : MAX_VIDEO_SIZE;
+  const maxSize = maxUploadBytes(file.type, type);
   if (file.size > maxSize) {
-    const limitMb = maxSize / (1024 * 1024);
+    const kind = type === "image" ? "ảnh" : "video";
     return {
       valid: false as const,
-      error: `File quá lớn. Giới hạn ${type === "image" ? "ảnh" : "video"}: ${limitMb}MB`,
+      error: `File quá lớn. Giới hạn ${kind}: ${formatMb(maxSize)}MB`,
     };
   }
 

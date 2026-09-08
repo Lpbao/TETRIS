@@ -47,6 +47,7 @@ export function SiteNavLinks({
             <li key={item.href}>
               <Link
                 href={item.href}
+                prefetch={!isActive}
                 onClick={onNavigate}
                 aria-current={menuPhase !== undefined && isActive ? "page" : undefined}
                 className={cn(

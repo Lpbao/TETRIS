@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
-import { siteProjects } from "@/lib/site-content";
+import { getPublishedProjectSlugs } from "@/lib/get-site-project";
 import { siteUrl } from "@/lib/site-metadata";
 
 const staticPaths = [
@@ -22,8 +22,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: path === "" ? 1 : 0.8,
   }));
 
-  const projectEntries: MetadataRoute.Sitemap = siteProjects.map((project) => ({
-    url: `${siteUrl}/projects/${project.slug}`,
+  const projectSlugs = await getPublishedProjectSlugs();
+  const projectEntries: MetadataRoute.Sitemap = projectSlugs.map((slug) => ({
+    url: `${siteUrl}/projects/${slug}`,
     lastModified: now,
     changeFrequency: "monthly",
     priority: 0.7,

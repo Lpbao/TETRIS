@@ -22,6 +22,18 @@ function readPositiveRatio(
   return value > 0 ? value : fallback;
 }
 
+function setCssVar(el: HTMLElement, name: string, value: string) {
+  if (el.style.getPropertyValue(name) === value) return;
+  el.style.setProperty(name, value);
+}
+
+function isCoarsePointer(): boolean {
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 767px)").matches
+  );
+}
+
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
@@ -81,6 +93,44 @@ function measurePhotoClipPercent(root: HTMLElement): number {
   return Math.min(100, (clipPx / pinRect.height) * 100);
 }
 
+/** Giữ phase morph khi inner viewport đổi (đóng/mở footer). Extra sau unstick giữ px. */
+function remapScrollTopForVvhChange(
+  scroller: HTMLElement,
+  prevVvh: number,
+  vvh: number,
+  letterRatio: number,
+  imageRatio: number,
+  alignSpeed: number,
+): void {
+  if (prevVvh < 1 || Math.abs(vvh - prevVvh) < 1) return;
+
+  const oldLetterDist = prevVvh * letterRatio;
+  const oldImageDist = prevVvh * imageRatio;
+  const oldUnstick =
+    oldLetterDist + (alignSpeed > 0 ? oldImageDist / alignSpeed : oldImageDist);
+  const newLetterDist = vvh * letterRatio;
+  const newImageDist = vvh * imageRatio;
+  const newUnstick =
+    newLetterDist + (alignSpeed > 0 ? newImageDist / alignSpeed : newImageDist);
+
+  const oldScroll = scroller.scrollTop;
+  let targetTop: number;
+
+  if (oldScroll > oldUnstick) {
+    targetTop = newUnstick + (oldScroll - oldUnstick);
+  } else if (oldLetterDist > 0 && oldScroll < oldLetterDist) {
+    targetTop = (oldScroll / oldLetterDist) * newLetterDist;
+  } else if (oldImageDist > 0) {
+    const pImage = clamp01((oldScroll - oldLetterDist) / oldImageDist);
+    targetTop = newLetterDist + pImage * newImageDist;
+  } else {
+    targetTop = oldScroll * (vvh / prevVvh);
+  }
+
+  if (Math.abs(targetTop - oldScroll) < 1) return;
+  scroller.scrollTop = targetTop;
+}
+
 function measureContentShiftPx(
   root: HTMLElement,
   titleGapPx: number,
@@ -98,12 +148,13 @@ function measureContentShiftPx(
   return measureVisualImageBottom(image) + titleGapPx - naturalTop;
 }
 
-/** Chữ (tùy chọn) → ảnh scale → pin dưới menu đến khi title cách photo `--morph-pin-title-gap`. */
+/** Chữ (tùy chọn) → ảnh scale → pin dưới menu → flow khi title cách photo `--morph-pin-title-gap` (sticky tự nhả). */
 export function useMorphPinScroll(sectionId: string) {
   const rootRef = useRef<HTMLDivElement>(null);
   const frozenTopRef = useRef<number | null>(null);
   const frozenShrinkRef = useRef<number | null>(null);
   const frozenShiftRef = useRef<number | null>(null);
+  const lastVvhRef = useRef(0);
   const shiftRef = useRef(0);
   const { pager, getPanelMotionState } = useFullPageScroll();
   const index = pager.sections.findIndex((section) => section.id === sectionId);
@@ -116,12 +167,25 @@ export function useMorphPinScroll(sectionId: string) {
 
     const scroller = root.closest("[data-fps-inner-scroll]");
     if (!(scroller instanceof HTMLElement)) return;
+    root.dataset.morphPinBound = "react";
 
     let frame = 0;
+    /* Đang chạm: không được set `scrollTop` (remap) — iOS sẽ hủy momentum và
+       ảnh giật thay vì scale. Chờ nhấc tay rồi mới remap. */
+    let touching = false;
 
     const sync = () => {
-      const vvh = scroller.clientHeight;
+      const vvhSlack = Math.max(
+        1,
+        readCssNumber(root, "--morph-pin-vvh-slack", 48),
+      );
+      let vvh = scroller.clientHeight;
       if (vvh <= 0) return;
+
+      const prevVvh = lastVvhRef.current;
+      if (prevVvh > 0 && (touching || Math.abs(vvh - prevVvh) < vvhSlack)) {
+        vvh = prevVvh;
+      }
 
       const letterRatio = Math.max(
         0,
@@ -144,9 +208,28 @@ export function useMorphPinScroll(sectionId: string) {
         1.2,
       );
       const titleGapPx = readCssNumber(root, "--morph-pin-title-gap", 0);
-
       const letterDist = vvh * letterRatio;
       const imageDist = vvh * imageRatio;
+      const alignUnstick =
+        letterDist + (alignSpeed > 0 ? imageDist / alignSpeed : imageDist);
+
+      const prevMeasuredVvh = lastVvhRef.current;
+      if (prevMeasuredVvh > 0 && Math.abs(vvh - prevMeasuredVvh) >= vvhSlack) {
+        setCssVar(root, "--morph-pin-vvh", `${vvh}px`);
+        setCssVar(root, "--morph-pin-collapse", `${alignUnstick}px`);
+        void scroller.offsetHeight;
+        remapScrollTopForVvhChange(
+          scroller,
+          prevMeasuredVvh,
+          vvh,
+          letterRatio,
+          imageRatio,
+          alignSpeed,
+        );
+        frozenShiftRef.current = null;
+      }
+      lastVvhRef.current = vvh;
+
       const scrollTop = scroller.scrollTop;
 
       const pLetter = letterDist > 0 ? clamp01(scrollTop / letterDist) : 1;
@@ -158,16 +241,16 @@ export function useMorphPinScroll(sectionId: string) {
       let pShrink = lettersOut ? clamp01(pImage * shrinkSpeed) : 0;
       let pTop = lettersOut ? clamp01(pImage * topSpeed) : 0;
       const pAlign = lettersOut ? clamp01(pImage * alignSpeed) : 0;
-      const unstickDist =
-        letterDist + (alignSpeed > 0 ? imageDist / alignSpeed : imageDist);
 
+      /* Scale đóng băng khi shrink xong; flow khi title cách ảnh title-gap.
+       Unstick = sticky tự nhả khi scrollTop > collapse (không đổi relative — tránh nhảy). */
+      const shrinkDone = lettersOut && pShrink >= 1;
       const titleArrived = lettersOut && pAlign >= 1;
-      const imageMorphDone = lettersOut && (pShrink >= 1 || titleArrived);
+      const freezeScale = shrinkDone || titleArrived;
 
-      if (!imageMorphDone) {
+      if (!freezeScale) {
         frozenTopRef.current = null;
         frozenShrinkRef.current = null;
-        frozenShiftRef.current = null;
       } else {
         if (frozenTopRef.current === null) {
           frozenTopRef.current = pTop;
@@ -179,44 +262,68 @@ export function useMorphPinScroll(sectionId: string) {
         pShrink = frozenShrinkRef.current;
       }
 
+      if (!titleArrived) {
+        frozenShiftRef.current = null;
+      }
+
       let phase = "letter";
-      if (imageMorphDone) phase = "pin";
+      if (titleArrived) phase = "flow";
+      else if (shrinkDone) phase = "pin";
       else if (lettersOut) phase = "image";
 
       root.dataset.morphPinPhase = phase;
-      root.style.setProperty("--morph-pin-vvh", `${vvh}px`);
-      root.style.setProperty("--morph-pin-p-letter", String(pLetter));
-      root.style.setProperty("--morph-pin-p-image", String(pImage));
-      root.style.setProperty("--morph-pin-p-shrink", String(pShrink));
-      root.style.setProperty("--morph-pin-p-top", String(pTop));
+
+      /* Dọn margin-top từ bản flow/relative cũ (tránh ảnh kẹt đáy sau hot reload). */
+      const pin = root.querySelector("[data-morph-pin-pin]");
+      if (pin instanceof HTMLElement && pin.style.marginTop) {
+        pin.style.removeProperty("margin-top");
+      }
+
+      setCssVar(root, "--morph-pin-vvh", `${vvh}px`);
+      setCssVar(root, "--morph-pin-p-letter", String(pLetter));
+      setCssVar(root, "--morph-pin-p-image", String(pImage));
+      setCssVar(root, "--morph-pin-p-shrink", String(pShrink));
+      setCssVar(root, "--morph-pin-p-top", String(pTop));
+      /* iOS: tránh calc(p * -1 * 100vw) — ghi thẳng px cho face exit */
+      setCssVar(
+        root,
+        "--morph-pin-letter-x",
+        `${Math.round(-pLetter * (window.visualViewport?.width ?? window.innerWidth))}px`,
+      );
 
       let contentShift = 0;
       if (lettersOut) {
-        const targetShift = measureContentShiftPx(
-          root,
-          titleGapPx,
-          shiftRef.current,
-        );
-        if (targetShift !== null) {
-          if (imageMorphDone) {
-            if (frozenShiftRef.current === null) {
-              frozenShiftRef.current = targetShift;
+        /* Đang chạm: đừng đo lại shift (getBoundingClientRect nhiễu → chữ/ảnh giật). */
+        if (touching) {
+          contentShift = shiftRef.current;
+        } else {
+          const targetShift = measureContentShiftPx(
+            root,
+            titleGapPx,
+            shiftRef.current,
+          );
+          if (targetShift !== null) {
+            if (titleArrived) {
+              if (frozenShiftRef.current === null) {
+                frozenShiftRef.current = targetShift;
+              }
+              contentShift = frozenShiftRef.current;
+            } else {
+              contentShift = pAlign * targetShift;
             }
-            contentShift = frozenShiftRef.current;
-          } else {
-            contentShift = pAlign * targetShift;
           }
         }
       }
 
       shiftRef.current = contentShift;
-      const collapse = unstickDist;
 
-      root.style.setProperty("--morph-pin-collapse", `${collapse}px`);
-      root.style.setProperty("--morph-pin-content-shift", `${contentShift}px`);
-      root.style.setProperty(
+      setCssVar(root, "--morph-pin-collapse", `${alignUnstick}px`);
+      setCssVar(root, "--morph-pin-content-shift", `${contentShift}px`);
+      const skipClip = isCoarsePointer();
+      setCssVar(
+        root,
         "--morph-pin-photo-clip",
-        lettersOut ? `${measurePhotoClipPercent(root)}%` : "0%",
+        !skipClip && lettersOut ? `${measurePhotoClipPercent(root)}%` : "0%",
       );
     };
 
@@ -228,6 +335,15 @@ export function useMorphPinScroll(sectionId: string) {
       });
     };
 
+    const onTouchStart = () => {
+      touching = true;
+    };
+
+    const onTouchEnd = () => {
+      touching = false;
+      sync();
+    };
+
     const img = root.querySelector("[data-morph-pin-image] img");
     const onImageLoad = () => sync();
 
@@ -237,6 +353,9 @@ export function useMorphPinScroll(sectionId: string) {
     }
 
     scroller.addEventListener("scroll", onScroll, { passive: true });
+    scroller.addEventListener("touchstart", onTouchStart, { passive: true });
+    scroller.addEventListener("touchend", onTouchEnd, { passive: true });
+    scroller.addEventListener("touchcancel", onTouchEnd, { passive: true });
     img?.addEventListener("load", onImageLoad);
     const observer = new ResizeObserver(sync);
     observer.observe(scroller);
@@ -244,6 +363,9 @@ export function useMorphPinScroll(sectionId: string) {
 
     return () => {
       scroller.removeEventListener("scroll", onScroll);
+      scroller.removeEventListener("touchstart", onTouchStart);
+      scroller.removeEventListener("touchend", onTouchEnd);
+      scroller.removeEventListener("touchcancel", onTouchEnd);
       img?.removeEventListener("load", onImageLoad);
       observer.disconnect();
       if (frame) cancelAnimationFrame(frame);

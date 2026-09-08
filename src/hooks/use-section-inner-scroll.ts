@@ -6,7 +6,7 @@ import type { InnerScrollSnapshot } from "@/lib/full-page-scroll/types";
 
 const DEFAULT_SNAPSHOT: InnerScrollSnapshot = {
   isAtTop: true,
-  isAtBottom: true,
+  isAtBottom: false,
 };
 
 function measureInnerScroll(el: HTMLElement): InnerScrollSnapshot {

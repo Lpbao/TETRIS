@@ -29,7 +29,7 @@ export const SECTION_ENTER_SWIPE_MIN = SECTION_EXIT_SWIPE_MIN;
 export const WHEEL_UP_ACCUM_THRESHOLD = 80;
 
 /** Đáy nội dung Home (footer đang ẩn) — extra swipe/wheel mới hiện footer */
-export const HOME_CONTENT_END_PX = 16;
+export const HOME_CONTENT_END_PX = 48;
 
 export type HomeScrollDirection = "up" | "down";
 
@@ -47,6 +47,82 @@ let programmaticScrollGuardUntil = 0;
 export function getHeaderOffset(): number {
   if (typeof document === "undefined") return 64;
   return document.querySelector("header")?.getBoundingClientRect().height ?? 64;
+}
+
+function measureCssHeight(height: string): number {
+  const probe = document.createElement("div");
+  probe.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;height:${height}`;
+  document.documentElement.appendChild(probe);
+  const value = probe.getBoundingClientRect().height;
+  probe.remove();
+  return value;
+}
+
+/** Fallback thanh URL/toolbar đáy (Safari / Zalo / Chrome) khi visualViewport không đo được */
+export const SITE_URLBAR_BOTTOM_FALLBACK_PX = 112;
+
+function isMobileViewport(): boolean {
+  return window.matchMedia("(max-width: 767px)").matches;
+}
+
+/** Khoảng layout viewport nhô xuống dưới visual viewport = thanh URL/toolbar đáy */
+export function getUrlBarBottomInset(): number {
+  if (typeof window === "undefined") return 0;
+  const vv = window.visualViewport;
+  const layoutH = Math.max(
+    window.innerHeight,
+    document.documentElement.clientHeight,
+    measureCssHeight("100lvh"),
+  );
+  if (!vv) {
+    return isMobileViewport() ? SITE_URLBAR_BOTTOM_FALLBACK_PX : 0;
+  }
+  const visualBottom = vv.offsetTop + vv.height;
+  const measured = Math.max(0, Math.round(layoutH - visualBottom));
+  if (measured > 1) return measured;
+  return isMobileViewport() ? SITE_URLBAR_BOTTOM_FALLBACK_PX : 0;
+}
+
+/** Viewport nhỏ (`100svh`, thanh URL đang hiện) — không đổi khi iOS thu/nhả
+ *  thanh URL. Dùng cho panel full-page scroll: panel luôn nằm gọn trong vùng
+ *  thấy được và không bị đo lại giữa lúc scroll (scroll sẽ giật). */
+export function getStableViewportHeight(): number {
+  if (typeof window === "undefined") return 0;
+  const svh = measureCssHeight("100svh");
+  if (svh > 0) return svh;
+  return window.visualViewport?.height ?? window.innerHeight;
+}
+
+/** Chiều cao hero = vùng nhìn thấy + thanh URL đáy — không co theo visualViewport */
+export function getSiteViewportHeight(): number {
+  if (typeof window === "undefined") return 0;
+  const dvh = measureCssHeight("100dvh");
+  const lvh = measureCssHeight("100lvh");
+  const inner = window.innerHeight;
+  const client = document.documentElement.clientHeight;
+  const urlbar = getUrlBarBottomInset();
+  return Math.max(lvh, inner, client, dvh + urlbar);
+}
+
+export function syncSiteViewportHeight(): void {
+  const urlbar = getUrlBarBottomInset();
+  document.documentElement.style.setProperty(
+    "--site-urlbar-bottom",
+    `${urlbar}px`,
+  );
+}
+
+export function subscribeSiteViewportHeight(): () => void {
+  const sync = () => syncSiteViewportHeight();
+  sync();
+  window.addEventListener("resize", sync, { passive: true });
+  window.addEventListener("orientationchange", sync);
+  window.visualViewport?.addEventListener("resize", sync);
+  return () => {
+    window.removeEventListener("resize", sync);
+    window.removeEventListener("orientationchange", sync);
+    window.visualViewport?.removeEventListener("resize", sync);
+  };
 }
 
 export function getHomeScrollBehavior(): ScrollBehavior {
@@ -112,8 +188,11 @@ export function isRestStateAnchorA(
   );
   const scrollAligned =
     Math.abs(scrollY - anchorScrollY) <= PROJECTS_SCROLL_TOLERANCE_PX;
+  const atViewportTop =
+    Math.abs(section.getBoundingClientRect().top) <= SECTION_LAYOUT_TOLERANCE_PX;
+  const pageTopHero = section.offsetTop <= 0 && isHeroGestureActive();
 
-  return layoutAligned || scrollAligned;
+  return layoutAligned || scrollAligned || atViewportTop || pageTopHero;
 }
 
 /** P0 #3 — chỉ về anchor A từ limbo khi xuất phát từ anchor B (hoặc sát B) */
@@ -170,9 +249,22 @@ export function getSessionScrollDirection(
   return null;
 }
 
+/** Hero còn chiếm phần lớn viewport — Safari URL bar làm scrollY > 8 nhưng vẫn đang ở A */
+export function isHeroGestureActive(): boolean {
+  if (typeof window === "undefined") return true;
+  if (window.scrollY <= HERO_REST_MAX_SCROLL_Y) return true;
+
+  const hero = document.getElementById("hero-carousel");
+  if (!hero) return false;
+
+  const rect = hero.getBoundingClientRect();
+  const viewH = window.innerHeight;
+  return rect.top > -viewH * 0.2 && rect.bottom > viewH * 0.55;
+}
+
 /** Rest state A — carousel full màn */
 export function isRestStateHero(scrollY = window.scrollY): boolean {
-  return scrollY <= HERO_REST_MAX_SCROLL_Y;
+  return scrollY <= HERO_REST_MAX_SCROLL_Y || isHeroGestureActive();
 }
 
 /** Rest state B — top `#home-projects` ngay dưới menu */
@@ -222,15 +314,54 @@ export function isSectionGateOpen(
   tolerancePx = SECTION_LAYOUT_TOLERANCE_PX,
 ): boolean {
   const targetTop = getHeaderOffset();
-  const top = section.getBoundingClientRect().top;
   const projectsScrollY = Math.max(0, section.offsetTop - targetTop);
 
-  const layoutAligned = Math.abs(top - targetTop) <= tolerancePx;
+  const layoutAligned = isSectionBelowMenu(section, tolerancePx);
   const scrollAligned =
     window.scrollY > 48 &&
     Math.abs(window.scrollY - projectsScrollY) <= PROJECTS_SCROLL_TOLERANCE_PX;
 
   return layoutAligned || scrollAligned;
+}
+
+export function getWindowScrollY(): number {
+  return Math.max(
+    window.scrollY,
+    document.documentElement.scrollTop,
+    document.body?.scrollTop ?? 0,
+  );
+}
+
+/** Chiều cao màn thực đang thấy — iOS trừ thanh URL (`vh` tính cả thanh này) */
+export function getVisibleViewportHeight(): number {
+  return (
+    window.visualViewport?.height ||
+    window.innerHeight ||
+    document.documentElement.clientHeight
+  );
+}
+
+/** Ngưỡng scroll mở cổng project — token `--home-project-gate-scroll-ratio` (0.5 = 50vh) */
+export function readHomeProjectGateScrollY(root?: HTMLElement | null): number {
+  const el = root ?? document.getElementById("home-projects");
+  const raw = el
+    ? getComputedStyle(el)
+        .getPropertyValue("--home-project-gate-scroll-ratio")
+        .trim()
+    : "";
+  const ratio = Number.parseFloat(raw);
+  const resolved = Number.isFinite(ratio) && ratio > 0 ? ratio : 0.5;
+  return getVisibleViewportHeight() * resolved;
+}
+
+/** Lần đầu tới `#home-projects`: scrollY ≥ 50vh, hoặc top section đã qua vạch 50vh */
+export function isHomeProjectScrollGateOpen(
+  section?: HTMLElement | null,
+): boolean {
+  const threshold = readHomeProjectGateScrollY(section);
+  if (getWindowScrollY() >= threshold) return true;
+  if (!section) return false;
+  return section.getBoundingClientRect().top <= threshold;
 }
 
 export function getHomeRestState(
@@ -285,11 +416,32 @@ export function scrollToHero(behavior?: ScrollBehavior): void {
   window.scrollTo({ top: 0, behavior: resolved });
 }
 
-/** Rest state A — bất kỳ section anchor (chained pairs) */
+/** Vào Home: snap `top: 0`. Scroll restore do `site-page-reset` (manual toàn site). */
+export function attachHomeEnterScrollReset(): () => void {
+  scrollToHero("auto");
+
+  const pinTop = () => scrollToHero("auto");
+  window.addEventListener("pageshow", pinTop);
+  if (document.readyState !== "complete") {
+    window.addEventListener("load", pinTop, { once: true });
+  }
+
+  return () => {
+    window.removeEventListener("pageshow", pinTop);
+    window.removeEventListener("load", pinTop);
+  };
+}
+
+/** Rest state A — page-top hero về `top: 0`; section khác offset dưới menu */
 export function scrollToSectionAnchor(
   anchorAId: string,
   behavior?: ScrollBehavior,
 ): void {
+  const section = document.getElementById(anchorAId);
+  if (!section || section.offsetTop <= 0) {
+    scrollToHero(behavior);
+    return;
+  }
   scrollToProjectsAnchor(anchorAId, behavior);
 }
 
@@ -374,6 +526,25 @@ export function getCurtainScrollRoot(el: HTMLElement): HTMLElement | null {
   return root instanceof HTMLElement ? root : null;
 }
 
+function getViewportClip(
+  headerOffset: number,
+  root?: HTMLElement | null,
+): { top: number; bottom: number } {
+  if (root) {
+    const rect = root.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom };
+  }
+
+  const mobile = isMobileViewport();
+  const slack = mobile ? 28 : 4;
+  const vv = window.visualViewport;
+  const bottom = vv
+    ? vv.offsetTop + vv.height
+    : window.innerHeight;
+
+  return { top: headerOffset, bottom: bottom + slack };
+}
+
 /** Card ~100% height trong viewport dưới header (tolerance 92%) */
 export function isCardFullyVisible(
   el: HTMLElement,
@@ -381,7 +552,39 @@ export function isCardFullyVisible(
   minRatio = CARD_REVEAL_VISIBLE_RATIO,
   root?: HTMLElement | null,
 ): boolean {
-  return getCardVisibleRatio(el, headerOffset, root) >= minRatio;
+  return isCardFullyOnScreen(el, headerOffset, minRatio, root);
+}
+
+/**
+ * Một card đã lộ hết chiều cao trên màn (dưới menu).
+ * Mobile: slack đáy (URL bar); card cao hơn viewport → đủ khi lấp vùng còn lại.
+ */
+export function isCardFullyOnScreen(
+  el: HTMLElement,
+  headerOffset: number,
+  minRatio = CARD_REVEAL_VISIBLE_RATIO,
+  root?: HTMLElement | null,
+): boolean {
+  const rect = el.getBoundingClientRect();
+  if (rect.height <= 0) return false;
+
+  const { top: clipTop, bottom: clipBottom } = getViewportClip(
+    headerOffset,
+    root,
+  );
+  const available = Math.max(0, clipBottom - clipTop);
+  if (available <= 0) return false;
+
+  const visible = Math.max(
+    0,
+    Math.min(rect.bottom, clipBottom) - Math.max(rect.top, clipTop),
+  );
+
+  if (rect.height > available) {
+    return visible >= available * minRatio;
+  }
+
+  return visible / rect.height >= minRatio;
 }
 
 /** Phần card đang lộ (0–1) — viewport dưới header, hoặc clip theo inner-scroll root */
@@ -393,10 +596,10 @@ export function getCardVisibleRatio(
   const rect = el.getBoundingClientRect();
   if (rect.height <= 0) return 0;
 
-  const clipTop = root ? root.getBoundingClientRect().top : headerOffset;
-  const clipBottom = root
-    ? root.getBoundingClientRect().bottom
-    : window.innerHeight;
+  const { top: clipTop, bottom: clipBottom } = getViewportClip(
+    headerOffset,
+    root,
+  );
 
   const visibleTop = Math.max(rect.top, clipTop);
   const visibleBottom = Math.min(rect.bottom, clipBottom);

@@ -1,7 +1,12 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { projectCategories, type ProjectCategory } from "@/lib/site-content";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useSiteLoading } from "@/components/site/site-loading-context";
+import {
+  parseProjectCategory,
+  projectCategories,
+} from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 
 interface ProjectFilterProps {
@@ -9,25 +14,23 @@ interface ProjectFilterProps {
   stickTo?: "header" | "scroller";
 }
 
+function isTouchUi() {
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 767px)").matches
+  );
+}
+
 export function ProjectFilter({ stickTo = "header" }: ProjectFilterProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const active = searchParams.get("category") as ProjectCategory | null;
-
-  const setCategory = (category: ProjectCategory | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (category) params.set("category", category);
-    else params.delete("category");
-
-    const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  };
+  const { show } = useSiteLoading();
+  const active = parseProjectCategory(searchParams.get("category") ?? undefined);
 
   return (
     <nav
       className={cn(
-        "sticky z-10 shrink-0 border-b border-border/60 bg-background",
+        "sticky z-20 shrink-0 border-b border-border/60 bg-background",
         stickTo === "scroller"
           ? "top-0"
           : "top-[var(--site-header-total-height)]",
@@ -37,22 +40,28 @@ export function ProjectFilter({ stickTo = "header" }: ProjectFilterProps) {
       <ul className="mx-auto flex max-w-6xl items-center justify-center gap-8 px-4 py-5 md:gap-12 md:py-6">
         {projectCategories.map((category) => {
           const isActive = active === category.id;
+          const href = isActive
+            ? pathname
+            : `${pathname}?category=${category.id}`;
+
           return (
             <li key={category.id}>
-              <button
-                type="button"
-                onClick={() =>
-                  setCategory(isActive ? null : category.id)
-                }
+              <Link
+                href={href}
+                scroll={false}
+                prefetch={false}
+                onClick={() => {
+                  if (typeof window !== "undefined" && !isTouchUi()) show();
+                }}
                 className={cn(
-                  "text-xs font-medium uppercase tracking-[0.25em] md:text-sm",
+                  "inline-flex min-h-11 items-center touch-manipulation text-xs font-medium uppercase tracking-[0.25em] md:text-sm",
                   isActive
                     ? "text-brand-red"
                     : "text-foreground hover:text-brand-red",
                 )}
               >
                 {category.label}
-              </button>
+              </Link>
             </li>
           );
         })}

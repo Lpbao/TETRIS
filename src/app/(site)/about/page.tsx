@@ -1,5 +1,5 @@
 import { AboutPageScroll } from "@/components/site/about-page-scroll";
-import { siteAbout } from "@/lib/site-content";
+import { getSiteAbout } from "@/lib/get-site-about";
 import { createPageMetadata } from "@/lib/site-metadata";
 
 export const metadata = createPageMetadata({
@@ -9,6 +9,10 @@ export const metadata = createPageMetadata({
   path: "/about",
 });
 
-export default function AboutPage() {
-  return <AboutPageScroll content={siteAbout} />;
+/** CMS đổi là thấy ngay — không cache trang giới thiệu. */
+export const dynamic = "force-dynamic";
+
+export default async function AboutPage() {
+  const content = await getSiteAbout();
+  return <AboutPageScroll content={content} />;
 }

@@ -39,7 +39,7 @@ function prefersReducedMotion() {
 }
 
 /** Play khi element nằm trong vùng nhìn thấy của inner scroll. */
-function useMovingLettersInView(sectionId: string) {
+function useMovingLettersInView(sectionId: string, forcePlay = false) {
   const { pager, getPanelMotionState } = useFullPageScroll();
   const index = pager.sections.findIndex((section) => section.id === sectionId);
   const motion = index >= 0 ? getPanelMotionState(index) : "inactive";
@@ -52,6 +52,10 @@ function useMovingLettersInView(sectionId: string) {
   };
 
   useEffect(() => {
+    if (forcePlay) {
+      setPlay(true);
+      return;
+    }
     if (!ready) return;
     const el = nodeRef.current;
     if (!el) return;
@@ -62,12 +66,15 @@ function useMovingLettersInView(sectionId: string) {
     const isVisible = () => {
       const rect = el.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const clip = scroller?.getBoundingClientRect();
-      const top = Math.max(rect.top, clip?.top ?? 0, 0);
+      /* Chỉ clip theo inner scroller — không dùng window.innerHeight (iOS URL bar). */
+      const clip =
+        scroller instanceof HTMLElement
+          ? scroller.getBoundingClientRect()
+          : null;
+      const top = Math.max(rect.top, clip?.top ?? Number.NEGATIVE_INFINITY);
       const bottom = Math.min(
         rect.bottom,
-        clip?.bottom ?? window.innerHeight,
-        window.innerHeight,
+        clip?.bottom ?? Number.POSITIVE_INFINITY,
       );
       return bottom - top > 8;
     };
@@ -89,7 +96,7 @@ function useMovingLettersInView(sectionId: string) {
       window.removeEventListener("resize", tryStart);
       observer.disconnect();
     };
-  }, [ready]);
+  }, [ready, forcePlay]);
 
   return { setRef, play };
 }
@@ -98,6 +105,7 @@ const ML2_STAGGER_MS = 70;
 
 interface MovingLettersSectionProps extends MovingLettersProps {
   sectionId: string;
+  forcePlay?: boolean;
 }
 
 /** Moving Letters #2 — scale 4→1 + fade in, stagger, play once.
@@ -106,8 +114,9 @@ export function MovingLettersPop({
   text,
   className,
   sectionId,
+  forcePlay = false,
 }: MovingLettersSectionProps) {
-  const { setRef, play } = useMovingLettersInView(sectionId);
+  const { setRef, play } = useMovingLettersInView(sectionId, forcePlay);
   const chars = Array.from(text);
   let letterIndex = 0;
 

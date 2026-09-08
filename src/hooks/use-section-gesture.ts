@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { measureInnerScroll } from "@/hooks/use-section-inner-scroll";
+import {
+  getInnerScrollElForSection,
+  measureInnerScroll,
+} from "@/hooks/use-section-inner-scroll";
 import type { UseSectionPagerResult } from "@/hooks/use-section-pager";
 import {
   FPS_FIXED_GESTURE_MIN_PX,
+  FPS_INNER_SCROLL_EDGE_PX,
   FPS_WHEEL_NOTCH_MIN,
   PARTNERS_SCROLL_SELECTOR,
 } from "@/lib/full-page-scroll/constants";
@@ -22,10 +26,21 @@ interface UseSectionGestureOptions {
 }
 
 const INNER_SCROLL_GESTURE_PX = 2;
+/** Room tối thiểu mới được coi là “có cuộn” / chặn rubber-band */
+const MIN_SCROLL_ROOM_PX = 64;
 
 function isPartnersHorizontalTouch(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   return Boolean(target.closest(PARTNERS_SCROLL_SELECTOR));
+}
+
+function isSiteChromeTouch(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(".site-header") ||
+      target.closest("#site-mobile-menu") ||
+      target.closest("[data-site-loading]"),
+  );
 }
 
 function getInnerScrollEl(eventTarget: EventTarget | null): HTMLElement | null {
@@ -34,20 +49,69 @@ function getInnerScrollEl(eventTarget: EventTarget | null): HTMLElement | null {
   return el instanceof HTMLElement ? el : null;
 }
 
+/** Inner của màn đang active — không lấy hero (querySelector đầu tiên). */
+function resolveInnerScroll(
+  eventTarget: EventTarget | null,
+  pager: UseSectionPagerResult,
+): HTMLElement | null {
+  const section = pager.sections[pager.currentIndex];
+  const currentInner = section
+    ? getInnerScrollElForSection(section.id)
+    : null;
+
+  const fromTarget = getInnerScrollEl(eventTarget);
+  if (fromTarget && currentInner && currentInner.contains(fromTarget)) {
+    return fromTarget;
+  }
+  if (fromTarget && section) {
+    const panel = document.getElementById(section.id);
+    if (panel?.contains(fromTarget)) return fromTarget;
+  }
+  return currentInner ?? fromTarget;
+}
+
+/** Chặn rubber-band chỉ khi thật sự ở đáy nội dung có room cuộn. */
+function shouldBlockOverscroll(innerEl: HTMLElement): boolean {
+  const maxScroll = innerEl.scrollHeight - innerEl.clientHeight;
+  if (maxScroll < MIN_SCROLL_ROOM_PX) return false;
+
+  const live = measureInnerScroll(innerEl);
+  if (!live.isAtBottom) return false;
+
+  /* Brand-break: gần đỉnh hoặc logo chưa rest → không bao giờ preventDefault */
+  const brand = innerEl.querySelector("[data-brand-break]");
+  if (brand instanceof HTMLElement) {
+    if (brand.getAttribute("data-brand-break-logo") !== "rest") return false;
+    if (innerEl.scrollTop < MIN_SCROLL_ROOM_PX) return false;
+  }
+
+  return true;
+}
+
+/** Brand-break: footer chỉ sau logo rest. */
+function canOpenAboutBrandBreakFooter(): boolean {
+  const brand = document
+    .getElementById("about-brand-break")
+    ?.querySelector("[data-brand-break]");
+  if (!(brand instanceof HTMLElement)) return true;
+  return brand.getAttribute("data-brand-break-logo") === "rest";
+}
+
 export function useSectionGesture({
   pager,
-  enabled,
+  enabled: _enabled,
   targetRef,
 }: UseSectionGestureOptions) {
+  const pagerRef = useRef(pager);
+  pagerRef.current = pager;
   const touchOriginRef = useRef<TouchOrigin | null>(null);
   const swipeAxisRef = useRef<SwipeAxis>(null);
   const innerScrollStartTopRef = useRef<number | null>(null);
   const innerEdgeStartRef = useRef<InnerScrollSnapshot | null>(null);
+  const innerTakeoverRef = useRef(false);
   const reengagePendingRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return;
-
     const target = targetRef.current;
     if (!target) return;
 
@@ -56,9 +120,19 @@ export function useSectionGesture({
       swipeAxisRef.current = null;
       innerScrollStartTopRef.current = null;
       innerEdgeStartRef.current = null;
+      innerTakeoverRef.current = false;
     };
 
     const onTouchStart = (event: TouchEvent) => {
+      if (pagerRef.current.isTerminalReleased) {
+        resetTouch();
+        return;
+      }
+      if (isSiteChromeTouch(event.target)) {
+        resetTouch();
+        return;
+      }
+      if (!target.contains(event.target as Node)) return;
       const touch = event.touches[0];
       if (!touch) return;
 
@@ -67,11 +141,13 @@ export function useSectionGesture({
         ? "horizontal"
         : null;
 
-      const innerEl = getInnerScrollEl(event.target);
+      const innerEl = resolveInnerScroll(event.target, pagerRef.current);
       innerScrollStartTopRef.current = innerEl?.scrollTop ?? null;
       innerEdgeStartRef.current = innerEl
         ? measureInnerScroll(innerEl)
-        : pager.syncInnerScrollFromDom(pager.currentIndex);
+        : pagerRef.current.syncInnerScrollFromDom(
+            pagerRef.current.currentIndex,
+          );
     };
 
     const onTouchMove = (event: TouchEvent) => {
@@ -90,9 +166,58 @@ export function useSectionGesture({
       ) {
         swipeAxisRef.current = absX >= absY ? "horizontal" : "vertical";
       }
+
+      const innerEl = resolveInnerScroll(event.target, pagerRef.current);
+      const startTop = innerScrollStartTopRef.current;
+
+      if (
+        innerEl &&
+        startTop !== null &&
+        swipeAxisRef.current === "vertical" &&
+        absY >= SECTION_AXIS_LOCK_MIN
+      ) {
+        const nativeMoved = Math.abs(innerEl.scrollTop - startTop) > 2;
+        const goingDown = deltaY < 0;
+        const goingUp = deltaY > 0;
+        const live = measureInnerScroll(innerEl);
+        const maxScroll = innerEl.scrollHeight - innerEl.clientHeight;
+        const hasRoom = maxScroll >= MIN_SCROLL_ROOM_PX;
+        /* Chỉ takeover khi native không cuộn — đừng force (đánh nhau → giật). */
+        if (
+          !innerTakeoverRef.current &&
+          !nativeMoved &&
+          hasRoom &&
+          ((goingDown && !live.isAtBottom) || (goingUp && !live.isAtTop))
+        ) {
+          innerTakeoverRef.current = true;
+        }
+        if (innerTakeoverRef.current) {
+          const nextTop = Math.max(
+            0,
+            Math.min(maxScroll, startTop - deltaY),
+          );
+          innerEl.scrollTop = nextTop;
+          if (event.cancelable) event.preventDefault();
+          return;
+        }
+      }
+
+      if (
+        innerEl &&
+        deltaY < 0 &&
+        absY >= SECTION_AXIS_LOCK_MIN &&
+        shouldBlockOverscroll(innerEl) &&
+        event.cancelable
+      ) {
+        event.preventDefault();
+      }
     };
 
-    const onTouchEnd = (event: TouchEvent) => {
+    const finishTouch = (event: TouchEvent) => {
+      if (isSiteChromeTouch(event.target)) {
+        resetTouch();
+        return;
+      }
       const origin = touchOriginRef.current;
       const touch = event.changedTouches[0];
       if (!origin || !touch) {
@@ -107,42 +232,86 @@ export function useSectionGesture({
       const axis =
         swipeAxisRef.current ?? (absX >= absY ? "horizontal" : "vertical");
 
-      const innerEl = getInnerScrollEl(event.target);
+      const innerEl = resolveInnerScroll(event.target, pagerRef.current);
       const innerScrollStartTop = innerScrollStartTopRef.current;
-      const startedAtEdge = innerEdgeStartRef.current;
+      const startedAtBottom = innerEdgeStartRef.current?.isAtBottom ?? false;
+      const startedAtTop = innerEdgeStartRef.current?.isAtTop ?? false;
       resetTouch();
 
+      const p = pagerRef.current;
+      /* Released / footer: giao handler riêng — tránh nuốt vuốt đóng footer. */
+      if (
+        p.isTerminalReleased ||
+        p.footerPhase === "open" ||
+        p.footerPhase === "opening" ||
+        p.footerPhase === "closing"
+      ) {
+        return;
+      }
+      if (p.isTransitioning) return;
       if (axis !== "vertical") return;
       if (absY < FPS_FIXED_GESTURE_MIN_PX) return;
 
-      const inner = pager.syncInnerScrollFromDom(pager.currentIndex);
+      const inner = p.syncInnerScrollFromDom(p.currentIndex);
+      const lastIndex = p.sections.length - 1;
+      const isLastTerminal =
+        p.currentIndex === lastIndex &&
+        p.sections[lastIndex]?.mode === "terminal";
       const innerMoved =
         innerEl &&
         innerScrollStartTop !== null &&
         Math.abs(innerEl.scrollTop - innerScrollStartTop) >
           INNER_SCROLL_GESTURE_PX;
 
-      if (innerMoved) {
-        if (deltaY > 0 && !inner.isAtBottom) return;
-        if (deltaY < 0 && !inner.isAtTop) return;
-      }
-
-      if (deltaY < 0) {
-        if (startedAtEdge && !startedAtEdge.isAtTop) return;
-        if (pager.canGoPrev()) pager.goPrev();
+      if (innerMoved && !startedAtBottom && !inner.isAtBottom) {
         return;
       }
 
-      if (startedAtEdge && !startedAtEdge.isAtBottom) return;
-      if (pager.canGoNext()) pager.goNext();
+      /* Màn cuối @ đáy: vuốt tiếp (finger lên) → openFooter; chưa rest thì bỏ qua. */
+      if (isLastTerminal && (startedAtBottom || inner.isAtBottom)) {
+        if (deltaY < 0) {
+          const sectionId = p.sections[p.currentIndex]?.id;
+          if (
+            sectionId === "about-brand-break" &&
+            !canOpenAboutBrandBreakFooter()
+          ) {
+            return;
+          }
+          if (p.canGoNext()) p.goNext();
+        }
+        return;
+      }
+
+      /* Finger lên (deltaY < 0) = cuộn nội dung xuống / sang màn sau — không goPrev. */
+      if (deltaY < 0) {
+        if (startedAtBottom || inner.isAtBottom) {
+          p.goNext();
+        }
+        return;
+      }
+
+      /* Finger xuống = cuộn lên / về màn trước — chỉ khi đang ở đỉnh. */
+      if (startedAtTop || inner.isAtTop) {
+        p.goPrev();
+      }
     };
 
     const onWheel = (event: WheelEvent) => {
+      const p = pagerRef.current;
+      if (
+        p.isTerminalReleased ||
+        p.footerPhase === "open" ||
+        p.footerPhase === "opening" ||
+        p.footerPhase === "closing"
+      ) {
+        return;
+      }
+      if (p.isTransitioning) return;
       if (Math.abs(event.deltaY) < FPS_WHEEL_NOTCH_MIN) return;
 
-      const section = pager.sections[pager.currentIndex];
-      const innerScrollEl = getInnerScrollEl(event.target);
-      const inner = pager.syncInnerScrollFromDom(pager.currentIndex);
+      const section = p.sections[p.currentIndex];
+      const innerScrollEl = resolveInnerScroll(event.target, p);
+      const inner = p.syncInnerScrollFromDom(p.currentIndex);
 
       if (
         section &&
@@ -152,40 +321,64 @@ export function useSectionGesture({
       ) {
         if (event.deltaY > 0 && !inner.isAtBottom) {
           innerScrollEl.scrollTop += event.deltaY;
-          pager.syncInnerScrollFromDom(pager.currentIndex);
+          p.syncInnerScrollFromDom(p.currentIndex);
           return;
         }
         if (event.deltaY < 0 && !inner.isAtTop) {
           innerScrollEl.scrollTop += event.deltaY;
-          pager.syncInnerScrollFromDom(pager.currentIndex);
+          p.syncInnerScrollFromDom(p.currentIndex);
           return;
         }
       }
 
-      if (event.deltaY > 0 && pager.canGoNext()) {
-        pager.goNext();
+      if (event.deltaY > 0) {
+        const lastIndex = p.sections.length - 1;
+        const isLastTerminal =
+          p.currentIndex === lastIndex &&
+          p.sections[lastIndex]?.mode === "terminal";
+        if (isLastTerminal && inner.isAtBottom) {
+          if (
+            section?.id === "about-brand-break" &&
+            !canOpenAboutBrandBreakFooter()
+          ) {
+            return;
+          }
+          if (p.canGoNext()) p.goNext();
+          return;
+        }
+        p.goNext();
         return;
       }
 
-      if (event.deltaY < 0 && pager.canGoPrev()) {
-        pager.goPrev();
-      }
+      p.goPrev();
     };
 
-    target.addEventListener("touchstart", onTouchStart, { passive: true });
-    target.addEventListener("touchmove", onTouchMove, { passive: true });
-    target.addEventListener("touchend", onTouchEnd, { passive: true });
-    target.addEventListener("touchcancel", resetTouch, { passive: true });
+    document.addEventListener("touchstart", onTouchStart, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("touchmove", onTouchMove, {
+      capture: true,
+      passive: false,
+    });
+    document.addEventListener("touchend", finishTouch, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("touchcancel", finishTouch, {
+      capture: true,
+      passive: true,
+    });
     target.addEventListener("wheel", onWheel, { passive: true });
 
     return () => {
-      target.removeEventListener("touchstart", onTouchStart);
-      target.removeEventListener("touchmove", onTouchMove);
-      target.removeEventListener("touchend", onTouchEnd);
-      target.removeEventListener("touchcancel", resetTouch);
+      document.removeEventListener("touchstart", onTouchStart, true);
+      document.removeEventListener("touchmove", onTouchMove, true);
+      document.removeEventListener("touchend", finishTouch, true);
+      document.removeEventListener("touchcancel", finishTouch, true);
       target.removeEventListener("wheel", onWheel);
     };
-  }, [enabled, pager, targetRef]);
+  }, [targetRef]);
 
   useEffect(() => {
     if (!pager.isTerminalReleased) {
@@ -244,15 +437,25 @@ export function useSectionGesture({
       resetReleasedTouch();
 
       if (axis !== "vertical") return;
-      if (deltaY >= 0) return;
       if (absY < FPS_FIXED_GESTURE_MIN_PX) return;
 
+      /* Footer hiện: vuốt lên (docs) hoặc vuốt xuống / scroll lên nội dung → ẩn */
+      if (pager.footerPhase === "open" || pager.footerPhase === "opening") {
+        if (pager.canGoPrev()) pager.goPrev();
+        return;
+      }
+
+      if (deltaY >= 0) return;
       if (pager.canGoPrev()) pager.goPrev();
     };
 
     const onReleasedWheel = (event: WheelEvent) => {
-      if (event.deltaY >= 0) return;
       if (Math.abs(event.deltaY) < FPS_WHEEL_NOTCH_MIN) return;
+      if (pager.footerPhase === "open" || pager.footerPhase === "opening") {
+        if (pager.canGoPrev()) pager.goPrev();
+        return;
+      }
+      if (event.deltaY >= 0) return;
       if (pager.canGoPrev()) pager.goPrev();
     };
 
@@ -284,7 +487,7 @@ export function useSectionGesture({
   }, [pager, pager.isTerminalReleased]);
 
   useEffect(() => {
-    if (pager.footerPhase !== "open") return;
+    if (pager.footerPhase !== "open" && pager.footerPhase !== "opening") return;
 
     const footer = document.getElementById("site-footer");
     if (!footer) return;
@@ -333,13 +536,13 @@ export function useSectionGesture({
         (Math.abs(touch.clientX - origin.x) >= absY ? "horizontal" : "vertical");
       resetFooterTouch();
 
-      if (axis !== "vertical" || deltaY >= 0) return;
+      if (axis !== "vertical") return;
       if (absY < FPS_FIXED_GESTURE_MIN_PX) return;
+      /* Vuốt lên hoặc xuống trên footer → đóng */
       if (pager.canGoPrev()) pager.goPrev();
     };
 
     const onFooterWheel = (event: WheelEvent) => {
-      if (event.deltaY >= 0) return;
       if (Math.abs(event.deltaY) < FPS_WHEEL_NOTCH_MIN) return;
       if (pager.canGoPrev()) pager.goPrev();
     };

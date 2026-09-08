@@ -14,7 +14,7 @@ export default function AdminPagesHubPage() {
     <>
       <AdminPageHeader
         title="Layout landing"
-        description="Nội dung 5 trang — lưu SitePage, chưa hiển thị trên site public."
+        description="Nội dung 5 trang — lưu SitePage. Home / About / Services / Contact (email, SĐT, địa chỉ) đã hiện trên site public."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,11 +1,6 @@
-import { BrandBreakLines } from "@/components/site/brand-break-lines";
+import { LogoComponent } from "@/components/site/logo-component";
 import { SiteImage } from "@/components/site/site-image";
 import { cn } from "@/lib/utils";
-
-export {
-  BRAND_BREAK_LINES,
-  type BrandBreakLineId,
-} from "@/components/site/brand-break-lines";
 
 interface BrandBreakImageProps {
   image: string;
@@ -62,7 +57,7 @@ export function BrandBreak({
       )}
       aria-label="Brand break"
     >
-      <BrandBreakLines />
+      <LogoComponent />
       <BrandBreakImage image={image} imageAlt={imageAlt} />
     </section>
   );

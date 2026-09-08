@@ -4,9 +4,7 @@ import {
   projectCategories,
   siteAbout,
   siteContact,
-  siteHeroSlides,
   siteProjects,
-  siteServices,
 } from "../src/lib/site-content";
 import { categorySchema } from "../src/lib/validations/category";
 import { postSchema } from "../src/lib/validations/post";
@@ -26,19 +24,19 @@ function asJson(value: unknown): Prisma.InputJsonValue {
 }
 
 const sitePageSeeds: { slug: SitePageSlug; content: unknown }[] = [
-  { slug: "home", content: { slides: cloneJson(siteHeroSlides) } },
   { slug: "about", content: cloneJson(siteAbout) },
   {
     slug: "projects",
     content: { note: "Danh sách dự án quản lý ở Bài đăng" },
   },
-  { slug: "services", content: { items: cloneJson(siteServices) } },
   {
     slug: "contact",
     content: {
       email: siteContact.email,
       phone: siteContact.phone,
-      address: siteContact.address,
+      addressLine: "Số 31 Ngõ 135 Đội Cấn, Ba Đình",
+      province: "Hà Nội",
+      address: "Số 31 Ngõ 135 Đội Cấn, Ba Đình, Hà Nội, Việt Nam",
     },
   },
 ];

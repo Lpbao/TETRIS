@@ -13,6 +13,8 @@ interface ContentSectionProps {
   headingEffect?: "ml2";
   bodyEffect?: "text-focus-in";
   movingLettersSectionId?: string;
+  /** Ép ml2 play (vd. content-partner đã animate in trên iOS) */
+  forceLettersPlay?: boolean;
   bodyClassName?: string;
   scrollBlur?: boolean;
 }
@@ -25,12 +27,17 @@ export function ContentSection({
   headingEffect,
   bodyEffect,
   movingLettersSectionId,
+  forceLettersPlay = false,
   bodyClassName,
   scrollBlur = false,
 }: ContentSectionProps) {
   const titleNode =
     headingEffect === "ml2" && movingLettersSectionId ? (
-      <MovingLettersPop text={title} sectionId={movingLettersSectionId} />
+      <MovingLettersPop
+        text={title}
+        sectionId={movingLettersSectionId}
+        forcePlay={forceLettersPlay}
+      />
     ) : movingLetters ? (
       <MovingLetters text={title} />
     ) : (
@@ -43,7 +50,7 @@ export function ContentSection({
         data-section-title=""
         data-ml7-heading={movingLetters ? "" : undefined}
         data-ml2-heading={headingEffect === "ml2" ? "" : undefined}
-        className="text-sm font-bold uppercase tracking-[0.3em]"
+        className="text-sm font-bold uppercase"
       >
         {scrollBlur ? <span data-scroll-blur="">{titleNode}</span> : titleNode}
       </h2>

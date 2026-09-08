@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   servicesPageSchema,
-  type ServicesPageContent,
+  type ServicesPageFormValues,
 } from "@/lib/validations/site-page";
 
 const emptyService = {
@@ -29,7 +29,7 @@ const emptyService = {
 export function ServicesPageForm({
   initialData,
 }: {
-  initialData: ServicesPageContent;
+  initialData: ServicesPageFormValues;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function ServicesPageForm({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<ServicesPageContent>({
+  } = useForm<ServicesPageFormValues>({
     resolver: zodResolver(servicesPageSchema),
     defaultValues: initialData,
   });
@@ -52,7 +52,7 @@ export function ServicesPageForm({
     name: "items",
   });
 
-  const onSubmit = async (data: ServicesPageContent) => {
+  const onSubmit = async (data: ServicesPageFormValues) => {
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -68,6 +68,12 @@ export function ServicesPageForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {fields.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Chưa có dịch vụ trên database. Thêm khối, chọn ảnh từ Media, rồi lưu.
+        </p>
+      )}
+
       {fields.map((field, index) => (
         <div key={field.id} className="space-y-4 rounded-lg border p-4">
           <div className="flex items-center justify-between gap-2">
@@ -97,7 +103,6 @@ export function ServicesPageForm({
                 type="button"
                 variant="outline"
                 size="icon"
-                disabled={fields.length <= 1}
                 onClick={() => remove(index)}
                 aria-label="Xóa dịch vụ"
               >

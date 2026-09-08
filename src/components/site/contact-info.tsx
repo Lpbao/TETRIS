@@ -1,12 +1,13 @@
-import { siteContact } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
+import type { ContactPageContent } from "@/lib/validations/site-page";
 
 interface ContactInfoProps {
+  contact: ContactPageContent;
   className?: string;
 }
 
-export function ContactInfo({ className }: ContactInfoProps) {
-  const phoneHref = siteContact.phone.replace(/\s/g, "");
+export function ContactInfo({ contact, className }: ContactInfoProps) {
+  const phoneHref = contact.phone.replace(/\s/g, "");
 
   return (
     <section className={cn("py-12 text-center md:py-16", className)}>
@@ -14,10 +15,10 @@ export function ContactInfo({ className }: ContactInfoProps) {
         <p>
           <span className="sr-only">Email: </span>
           <a
-            href={`mailto:${siteContact.email}`}
+            href={`mailto:${contact.email}`}
             className="transition-colors hover:text-brand-red"
           >
-            {siteContact.email}
+            {contact.email}
           </a>
         </p>
         <p>
@@ -26,12 +27,12 @@ export function ContactInfo({ className }: ContactInfoProps) {
             href={`tel:${phoneHref}`}
             className="transition-colors hover:text-brand-red"
           >
-            {siteContact.phone}
+            {contact.phone}
           </a>
         </p>
         <p>
           <span className="text-foreground">Địa chỉ: </span>
-          {siteContact.address}
+          {contact.address}
         </p>
       </div>
     </section>

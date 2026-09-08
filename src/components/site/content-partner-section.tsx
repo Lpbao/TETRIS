@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ContentSection } from "@/components/site/content-section";
 import { PartnersRow } from "@/components/site/partners-row";
+import type { BrandBreakLogoPhase } from "@/hooks/use-brand-break-scroll";
 import { cn } from "@/lib/utils";
 
 interface ContentPartnerSectionProps {
@@ -13,9 +14,28 @@ interface ContentPartnerSectionProps {
   className?: string;
   /** Pager section id — ml2 play khi heading vào view */
   lettersSectionId?: string;
+  /** Brand-break logo phase — hiện text khi rest kể cả in-view chậm trên iOS */
+  logoPhase?: BrandBreakLogoPhase;
 }
 
-function useScrollerInViewOnce() {
+/** Clip theo inner scroller thôi — không clamp window.innerHeight (iOS URL bar sai). */
+function isInScrollerView(el: HTMLElement, minPx: number): boolean {
+  const rect = el.getBoundingClientRect();
+  if (rect.width < 1 || rect.height < 1) return false;
+  const scroller = el.closest("[data-fps-inner-scroll]");
+  const clip =
+    scroller instanceof HTMLElement
+      ? scroller.getBoundingClientRect()
+      : null;
+  const top = Math.max(rect.top, clip?.top ?? Number.NEGATIVE_INFINITY);
+  const bottom = Math.min(
+    rect.bottom,
+    clip?.bottom ?? Number.POSITIVE_INFINITY,
+  );
+  return bottom - top > minPx;
+}
+
+function useContentPartnerReveal(logoPhase?: BrandBreakLogoPhase) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -25,35 +45,44 @@ function useScrollerInViewOnce() {
     if (!el) return;
 
     const scroller = el.closest("[data-fps-inner-scroll]");
-    const isVisible = () => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width < 1 || rect.height < 1) return false;
-      const clip = scroller?.getBoundingClientRect();
-      const top = Math.max(rect.top, clip?.top ?? 0, 0);
-      const bottom = Math.min(
-        rect.bottom,
-        clip?.bottom ?? window.innerHeight,
-        window.innerHeight,
-      );
-      return bottom - top > 32;
-    };
+    let restFallback = 0;
 
     const tryStart = () => {
-      if (isVisible()) setVisible(true);
+      if (isInScrollerView(el, 24)) {
+        setVisible(true);
+        return true;
+      }
+      /* Logo rest + đã cuộn một chút: content-shift kéo chữ lên — coi như hiện */
+      if (
+        logoPhase === "rest" &&
+        scroller instanceof HTMLElement &&
+        scroller.scrollTop > 24
+      ) {
+        setVisible(true);
+        return true;
+      }
+      return false;
     };
 
-    tryStart();
+    if (tryStart()) return;
+
     scroller?.addEventListener("scroll", tryStart, { passive: true });
     window.addEventListener("resize", tryStart);
     const observer = new IntersectionObserver(tryStart, { threshold: 0 });
     observer.observe(el);
 
+    /* iOS: in-view đôi khi không fire — sau rest vẫn ép hiện text */
+    if (logoPhase === "rest") {
+      restFallback = window.setTimeout(() => setVisible(true), 500);
+    }
+
     return () => {
       scroller?.removeEventListener("scroll", tryStart);
       window.removeEventListener("resize", tryStart);
       observer.disconnect();
+      window.clearTimeout(restFallback);
     };
-  }, [visible]);
+  }, [visible, logoPhase]);
 
   return { ref, visible };
 }
@@ -65,8 +94,9 @@ export function ContentPartnerSection({
   partners,
   className,
   lettersSectionId = "about-brand-break",
+  logoPhase,
 }: ContentPartnerSectionProps) {
-  const { ref, visible } = useScrollerInViewOnce();
+  const { ref, visible } = useContentPartnerReveal(logoPhase);
 
   return (
     <div
@@ -85,6 +115,7 @@ export function ContentPartnerSection({
           headingEffect="ml2"
           bodyEffect="text-focus-in"
           movingLettersSectionId={lettersSectionId}
+          forceLettersPlay={visible}
         />
         <PartnersRow
           title={partnersTitle}
@@ -93,6 +124,7 @@ export function ContentPartnerSection({
           headingEffect="ml2"
           logoEffect="text-focus-in"
           lettersSectionId={lettersSectionId}
+          forceLettersPlay={visible}
         />
       </div>
     </div>

@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   homePageSchema,
-  type HomePageContent,
+  type HomePageFormValues,
 } from "@/lib/validations/site-page";
 
 const emptySlide = {
@@ -28,7 +28,7 @@ const emptySlide = {
 export function HomePageForm({
   initialData,
 }: {
-  initialData: HomePageContent;
+  initialData: HomePageFormValues;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function HomePageForm({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<HomePageContent>({
+  } = useForm<HomePageFormValues>({
     resolver: zodResolver(homePageSchema),
     defaultValues: initialData,
   });
@@ -51,7 +51,7 @@ export function HomePageForm({
     name: "slides",
   });
 
-  const onSubmit = async (data: HomePageContent) => {
+  const onSubmit = async (data: HomePageFormValues) => {
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -67,6 +67,12 @@ export function HomePageForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {fields.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Chưa có slide trên database. Thêm slide, chọn ảnh từ Media, rồi lưu.
+        </p>
+      )}
+
       {fields.map((field, index) => (
         <div key={field.id} className="space-y-4 rounded-lg border p-4">
           <div className="flex items-center justify-between gap-2">
@@ -96,7 +102,6 @@ export function HomePageForm({
                 type="button"
                 variant="outline"
                 size="icon"
-                disabled={fields.length <= 1}
                 onClick={() => remove(index)}
                 aria-label="Xóa slide"
               >

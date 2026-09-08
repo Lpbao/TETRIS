@@ -1,0 +1,8 @@
+{
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+  "github.copilot.chat.testGeneration.instructions": [
+    {
+      "text": "This repo has no test runner, no test files, and no testing library in package.json (Playwright appears only as a transitive Next.js optional). Do not generate Jest, Vitest, Testing Library, Playwright, or Cypress tests unless the user names a framework and asks for it. Prefer verifying via TypeScript, npm run lint, and existing Server Component / API patterns."
+    }
+  ]
+}

@@ -1,9 +1,5 @@
-import {
-  siteAbout,
-  siteContact,
-  siteHeroSlides,
-  siteServices,
-} from "@/lib/site-content";
+import { resolveContactAddressParts } from "@/lib/contact-address";
+import { siteAbout, siteContact } from "@/lib/site-content";
 import {
   aboutPageSchema,
   contactPageSchema,
@@ -11,41 +7,94 @@ import {
   servicesPageSchema,
   type AboutPageContent,
   type ContactPageContent,
-  type HomePageContent,
-  type ServicesPageContent,
+  type HomePageFormValues,
+  type ServicesPageFormValues,
 } from "@/lib/validations/site-page";
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-export function getSitePageFallback(slug: "home"): HomePageContent;
+export function getSitePageFallback(slug: "home"): HomePageFormValues;
 export function getSitePageFallback(slug: "about"): AboutPageContent;
-export function getSitePageFallback(slug: "services"): ServicesPageContent;
+export function getSitePageFallback(slug: "services"): ServicesPageFormValues;
 export function getSitePageFallback(slug: "contact"): ContactPageContent;
 export function getSitePageFallback(
   slug: "home" | "about" | "services" | "contact",
-) {
+):
+  | HomePageFormValues
+  | AboutPageContent
+  | ServicesPageFormValues
+  | ContactPageContent {
   switch (slug) {
-    case "home":
-      return homePageSchema.parse({ slides: cloneJson(siteHeroSlides) });
+    case "home": {
+      const empty: HomePageFormValues = { slides: [] };
+      return empty;
+    }
     case "about":
       return aboutPageSchema.parse(cloneJson(siteAbout));
-    case "services":
-      return servicesPageSchema.parse({ items: cloneJson(siteServices) });
-    case "contact":
+    case "services": {
+      const empty: ServicesPageFormValues = { items: [] };
+      return empty;
+    }
+    case "contact": {
+      const parts = resolveContactAddressParts({
+        address: siteContact.address,
+        province: "Hà Nội",
+      });
       return contactPageSchema.parse({
         email: siteContact.email,
         phone: siteContact.phone,
-        address: siteContact.address,
+        ...parts,
       });
+    }
   }
+}
+
+/** Chuẩn hoá contact CMS (legacy chỉ có `address` → addressLine + province). */
+export function normalizeContactPageContent(
+  content: unknown,
+): ContactPageContent | null {
+  const full = contactPageSchema.safeParse(content);
+  if (full.success) {
+    return full.data;
+  }
+
+  if (!content || typeof content !== "object") {
+    return null;
+  }
+
+  const row = content as Record<string, unknown>;
+  const email = typeof row.email === "string" ? row.email : null;
+  const phone = typeof row.phone === "string" ? row.phone : null;
+  const address = typeof row.address === "string" ? row.address : undefined;
+  const addressLine =
+    typeof row.addressLine === "string" ? row.addressLine : undefined;
+  const province =
+    typeof row.province === "string" ? row.province : undefined;
+
+  if (!email || !phone || (!address && !addressLine)) {
+    return null;
+  }
+
+  const parts = resolveContactAddressParts({
+    address,
+    addressLine,
+    province,
+  });
+
+  const parsed = contactPageSchema.safeParse({
+    email,
+    phone,
+    ...parts,
+  });
+  return parsed.success ? parsed.data : null;
 }
 
 export function resolveSitePageContent(
   slug: "home",
   content: unknown,
-): HomePageContent;
+): HomePageFormValues;
 export function resolveSitePageContent(
   slug: "about",
   content: unknown,
@@ -53,7 +102,7 @@ export function resolveSitePageContent(
 export function resolveSitePageContent(
   slug: "services",
   content: unknown,
-): ServicesPageContent;
+): ServicesPageFormValues;
 export function resolveSitePageContent(
   slug: "contact",
   content: unknown,
@@ -76,8 +125,9 @@ export function resolveSitePageContent(
       return parsed.success ? parsed.data : getSitePageFallback("services");
     }
     case "contact": {
-      const parsed = contactPageSchema.safeParse(content);
-      return parsed.success ? parsed.data : getSitePageFallback("contact");
+      return (
+        normalizeContactPageContent(content) ?? getSitePageFallback("contact")
+      );
     }
   }
 }

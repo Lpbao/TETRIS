@@ -1,11 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getHeaderOffset } from "@/lib/home-scroll";
+import { getHeaderOffset, getStableViewportHeight } from "@/lib/home-scroll";
 
 export interface ViewportBelowHeader {
   height: number;
   headerOffset: number;
+}
+
+/** Đổi nhỏ hơn ngưỡng này thì bỏ qua — tránh re-render/đo lại liên tục */
+const RESIZE_MIN_DELTA_PX = 24;
+
+function isCoarsePointer(): boolean {
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 767px)").matches
+  );
 }
 
 export function useViewportBelowHeader(): ViewportBelowHeader {
@@ -16,17 +26,30 @@ export function useViewportBelowHeader(): ViewportBelowHeader {
 
   const sync = useCallback(() => {
     const headerOffset = getHeaderOffset();
-    const visualHeight = window.visualViewport?.height ?? window.innerHeight;
+    /* Touch: dùng viewport ổn định (không co theo visualViewport). Nếu lấy
+       `visualViewport.height`, thanh URL iOS thu vào giữa lúc scroll sẽ đổi
+       chiều cao panel → inner scroller bị đo lại và scroll bị nhảy. */
+    const visualHeight = isCoarsePointer()
+      ? getStableViewportHeight()
+      : (window.visualViewport?.height ?? window.innerHeight);
     const height = Math.max(0, visualHeight - headerOffset);
 
-    setViewport({ height, headerOffset });
+    setViewport((previous) => {
+      if (
+        previous.headerOffset === headerOffset &&
+        Math.abs(previous.height - height) < RESIZE_MIN_DELTA_PX
+      ) {
+        return previous;
+      }
+      return { height, headerOffset };
+    });
   }, []);
 
   useEffect(() => {
     sync();
 
     window.addEventListener("resize", sync, { passive: true });
-    window.addEventListener("scroll", sync, { passive: true });
+    window.addEventListener("orientationchange", sync);
     window.visualViewport?.addEventListener("resize", sync);
 
     const header = document.querySelector("header");
@@ -41,7 +64,7 @@ export function useViewportBelowHeader(): ViewportBelowHeader {
 
     return () => {
       window.removeEventListener("resize", sync);
-      window.removeEventListener("scroll", sync);
+      window.removeEventListener("orientationchange", sync);
       window.visualViewport?.removeEventListener("resize", sync);
       resizeObserver?.disconnect();
     };

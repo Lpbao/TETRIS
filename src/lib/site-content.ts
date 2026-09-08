@@ -3,6 +3,8 @@
  * @see docs/architecture/DECISIONS.md
  */
 
+import { pickBalancedLatest } from "@/lib/pick-balanced-latest";
+
 export const siteBrand = {
   name: "TETRIS DESIGN",
   domain: "tetrisdesign.vn",
@@ -13,7 +15,7 @@ export const siteBrand = {
     red: "#7a1f27",
   },
   fonts: {
-    logo: "Fashion Didot W90 Regular",
+    logoDefaultFont: "Fashion Didot W90 Regular",
     ui: "UTM Avo",
   },
 } as const;
@@ -390,9 +392,12 @@ export function getProjectsByCategory(
 }
 
 export function getHomeProjects(limit = 8): SiteProject[] {
-  return siteProjects
-    .filter((project) => project.category !== "accommodation")
-    .slice(0, limit);
+  return pickBalancedLatest(
+    siteProjects,
+    limit,
+    (project) => project.category,
+    projectCategories.map((category) => category.id),
+  );
 }
 
 /** Ảnh bìa các dự án khác — section related trang detail. */

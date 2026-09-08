@@ -1,5 +1,5 @@
-import Link from "next/link";
 import Image from "next/image";
+import { ProjectCardLink } from "@/components/site/project-card-link";
 import type { SiteProject } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +34,8 @@ export function ProjectCard({
         alt={project.title}
         fill
         className={cn(
-          "object-contain object-center transition-transform duration-300 group-hover:scale-[1.02]",
+          "object-contain object-center",
+          isGallery && "transition-transform duration-300 group-hover:scale-[1.02]",
           isHome ? "p-1 md:p-3" : "p-4",
         )}
         sizes="(max-width: 768px) 50vw, 25vw"
@@ -44,7 +45,7 @@ export function ProjectCard({
 
   const meta = centerCaption ? (
     <>
-      <h3 className="mt-2.5 w-full text-center font-[family-name:var(--font-logo)] text-[13px] uppercase leading-tight tracking-[0.06em] text-foreground md:mt-3 md:text-sm">
+      <h3 className="mt-2.5 w-full text-center font-[family-name:var(--font-ui)] text-[13px] uppercase leading-tight tracking-[0.06em] text-foreground md:mt-3 md:text-sm">
         {project.title}
       </h3>
       <p className="mt-1 w-full text-center text-[11px] leading-snug text-foreground md:text-xs">
@@ -58,13 +59,13 @@ export function ProjectCard({
       {isGallery ? (
         media
       ) : (
-        <Link
+        <ProjectCardLink
           href={`/projects/${project.slug}`}
-          className="flex flex-col items-center"
+          triggerLoading={!isHome}
         >
           {media}
           {meta}
-        </Link>
+        </ProjectCardLink>
       )}
     </article>
   );

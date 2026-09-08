@@ -3,11 +3,11 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import { SiteNavLinks, type MobileMenuPhase } from "@/components/site/site-nav-links";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,35 @@ export const MENU_CLOSE_SEQUENCE_MS = MENU_LINKS_CLOSE_MS + MENU_CHROME_MS;
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const MENU_PANEL_ID = "site-mobile-menu";
+/** Hash "không trùng id nào" — gỡ `:target` khỏi panel khi chưa có JS */
+const MENU_CLOSED_HASH = "site-mobile-menu-closed";
+
+/** Chống double-toggle khi cả onClick lẫn fallback toạ độ cùng bắn */
+const TOGGLE_DEBOUNCE_MS = 400;
+/** Tap = di chuyển ngắn + nhanh (phân biệt với swipe hero/paging) */
+const TAP_MOVE_MAX_PX = 12;
+const TAP_DURATION_MAX_MS = 600;
+
+function isPointInsideNode(node: HTMLElement | null, x: number, y: number) {
+  if (!node) return false;
+  const rect = node.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return false;
+  return (
+    x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+  );
+}
+
+function clearMenuHash() {
+  const hash = window.location.hash.slice(1);
+  if (hash !== MENU_PANEL_ID && hash !== MENU_CLOSED_HASH) return;
+  window.history.replaceState(
+    null,
+    "",
+    `${window.location.pathname}${window.location.search}`,
+  );
+}
+
 export type { MobileMenuPhase };
 
 function subscribeReducedMotion(onStoreChange: () => void) {
@@ -42,6 +71,20 @@ function getReducedMotionServer() {
   return false;
 }
 
+/** Chỉ portal sau khi client mount — server render panel trong header (fallback
+    `:target`), không cần setState trong effect. */
+function subscribeNever() {
+  return () => {};
+}
+
+function getMountedClient() {
+  return true;
+}
+
+function getMountedServer() {
+  return false;
+}
+
 interface MobileNavProps {
   lightChrome?: boolean;
   open: boolean;
@@ -55,34 +98,110 @@ export function MobileNav({
   onOpenChange,
   onClosingChange,
 }: MobileNavProps) {
-  const menuId = useId();
-  const toggleRef = useRef<HTMLButtonElement>(null);
+  const toggleRef = useRef<HTMLAnchorElement>(null);
+  const closeToggleRef = useRef<HTMLAnchorElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const phaseRef = useRef<MobileMenuPhase>("closed");
+  const lastToggleAtRef = useRef(0);
+  const tapStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
   const [phase, setPhase] = useState<MobileMenuPhase>("closed");
-  const [panelVisible, setPanelVisible] = useState(false);
+  const mounted = useSyncExternalStore(
+    subscribeNever,
+    getMountedClient,
+    getMountedServer,
+  );
   const reducedMotion = useSyncExternalStore(
     subscribeReducedMotion,
     getReducedMotion,
     getReducedMotionServer,
   );
-  const chromeMs = reducedMotion ? 0 : MENU_CHROME_MS;
   const iconTone = lightChrome ? "bg-white" : "bg-foreground";
   const menuExpanded = phase !== "closed";
 
   const openMenu = useCallback(() => {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     setPhase("opening");
-    setPanelVisible(false);
     onClosingChange?.(false);
     onOpenChange(true);
   }, [onOpenChange, onClosingChange]);
 
   const closeMenu = useCallback(() => {
+    clearMenuHash();
     if (phase === "closed" || phase === "closing") return;
     setPhase("closing");
     onClosingChange?.(true);
   }, [phase, onClosingChange]);
+
+  const requestToggle = useCallback(
+    (next: "open" | "close") => {
+      const now = Date.now();
+      if (now - lastToggleAtRef.current < TOGGLE_DEBOUNCE_MS) return;
+      lastToggleAtRef.current = now;
+      if (next === "open") {
+        openMenu();
+        return;
+      }
+      closeMenu();
+    },
+    [openMenu, closeMenu],
+  );
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  /* Fallback theo toạ độ: iOS/Safari có lúc không giao click cho nút trong header
+     fixed (layer carousel `-webkit-overflow-scrolling`). Listener ở document vẫn
+     nhận event nên menu mở được ở mọi browser. */
+  useEffect(() => {
+    const toggleFromPoint = (x: number, y: number) => {
+      const closed = phaseRef.current === "closed";
+      const target = closed ? toggleRef.current : closeToggleRef.current;
+      if (!isPointInsideNode(target, x, y)) return;
+      requestToggle(closed ? "open" : "close");
+    };
+
+    const onClick = (event: MouseEvent) => {
+      /* Bàn phím (Enter/Space) cho toạ độ 0 — để onClick của nút xử lý */
+      if (event.clientX === 0 && event.clientY === 0) return;
+      toggleFromPoint(event.clientX, event.clientY);
+    };
+
+    const onTouchStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      tapStartRef.current = touch
+        ? { x: touch.clientX, y: touch.clientY, at: Date.now() }
+        : null;
+    };
+
+    const onTouchEnd = (event: TouchEvent) => {
+      const start = tapStartRef.current;
+      tapStartRef.current = null;
+      const touch = event.changedTouches[0];
+      if (!start || !touch) return;
+      if (Date.now() - start.at > TAP_DURATION_MAX_MS) return;
+      if (Math.abs(touch.clientX - start.x) > TAP_MOVE_MAX_PX) return;
+      if (Math.abs(touch.clientY - start.y) > TAP_MOVE_MAX_PX) return;
+      toggleFromPoint(touch.clientX, touch.clientY);
+    };
+
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("touchstart", onTouchStart, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("touchend", onTouchEnd, {
+      capture: true,
+      passive: true,
+    });
+
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("touchstart", onTouchStart, true);
+      document.removeEventListener("touchend", onTouchEnd, true);
+    };
+  }, [requestToggle]);
 
   useEffect(() => {
     if (phase === "opening") {
@@ -90,16 +209,11 @@ export function MobileNav({
         ? 0
         : MENU_OPEN_SEQUENCE_MS;
 
-      const panelTimer = window.setTimeout(
-        () => setPanelVisible(true),
-        chromeMs,
-      );
       const openTimer = window.setTimeout(
         () => setPhase("open"),
         openSequenceMs,
       );
       return () => {
-        window.clearTimeout(panelTimer);
         window.clearTimeout(openTimer);
       };
     }
@@ -108,26 +222,33 @@ export function MobileNav({
       const closeSequenceMs = reducedMotion ? 0 : MENU_CLOSE_SEQUENCE_MS;
 
       const closeTimer = window.setTimeout(() => {
-        setPanelVisible(false);
         setPhase("closed");
         onOpenChange(false);
         onClosingChange?.(false);
+        clearMenuHash();
       }, closeSequenceMs);
       return () => window.clearTimeout(closeTimer);
     }
-
-    if (phase === "closed") {
-      setPanelVisible(false);
-    }
-  }, [phase, onOpenChange, onClosingChange, chromeMs, reducedMotion]);
+  }, [phase, onOpenChange, onClosingChange, reducedMotion]);
 
   useEffect(() => {
     if (!open && phase !== "closed" && phase !== "closing") {
       setPhase("closed");
-      setPanelVisible(false);
       onClosingChange?.(false);
     }
   }, [open, phase, onClosingChange]);
+
+  /* Panel mở được bằng `:target` khi chưa hydrate — hydrate xong thì nhận lại
+     trạng thái đó thay vì xoá hash (nếu không menu tự đóng giữa lúc dùng). */
+  useEffect(() => {
+    if (window.location.hash !== `#${MENU_PANEL_ID}`) {
+      clearMenuHash();
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => openMenu());
+    return () => window.cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = menuExpanded ? "hidden" : "";
@@ -190,60 +311,64 @@ export function MobileNav({
     if (target?.isConnected) target.focus();
   }, [phase]);
 
+  const barClass = (extra: string) =>
+    cn(
+      "absolute block h-px w-6 transition-all duration-300 motion-reduce:transition-none",
+      iconTone,
+      extra,
+    );
+
+  const panel = (
+    <div
+      ref={panelRef}
+      id={MENU_PANEL_ID}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Menu điều hướng"
+      data-phase={phase}
+      className="mobile-menu-panel"
+    >
+      <div className="mobile-menu-panel-inner">
+        <SiteNavLinks menuPhase={phase} onNavigate={closeMenu} />
+      </div>
+    </div>
+  );
+
   return (
     <div className="lg:hidden">
-      <button
+      {/* Link hash, không phải button: chưa hydrate (chunk lỗi / mạng chậm)
+          thì `#site-mobile-menu:target` vẫn mở được panel. */}
+      <a
         ref={toggleRef}
-        type="button"
+        href={`#${MENU_PANEL_ID}`}
+        role="button"
         aria-expanded={menuExpanded}
-        aria-controls={menuId}
-        aria-label={menuExpanded ? "Đóng menu" : "Mở menu"}
-        className="site-header-menu-toggle relative z-10 flex shrink-0 items-center justify-center"
-        onClick={() => (menuExpanded ? closeMenu() : openMenu())}
+        aria-controls={MENU_PANEL_ID}
+        aria-label="Mở menu"
+        className="site-header-menu-toggle site-header-menu-toggle--open relative z-20 flex shrink-0 items-center justify-center"
+        onClick={() => requestToggle("open")}
       >
-        <span className="sr-only">{menuExpanded ? "Đóng menu" : "Mở menu"}</span>
-        <span
-          className={cn(
-            "absolute block h-px w-6 transition-all duration-300 motion-reduce:transition-none",
-            iconTone,
-            menuExpanded ? "translate-y-0 rotate-45" : "-translate-y-2",
-          )}
-        />
-        <span
-          className={cn(
-            "absolute block h-px w-6 transition-all duration-300 motion-reduce:transition-none",
-            iconTone,
-            menuExpanded ? "opacity-0" : "opacity-100",
-          )}
-        />
-        <span
-          className={cn(
-            "absolute block h-px w-6 transition-all duration-300 motion-reduce:transition-none",
-            iconTone,
-            menuExpanded ? "translate-y-0 -rotate-45" : "translate-y-2",
-          )}
-        />
-      </button>
-
-      {panelVisible && phase !== "closed" && (
-        <div
-          ref={panelRef}
-          id={menuId}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Menu điều hướng"
-          data-phase={phase}
-          className="mobile-menu-panel"
-          aria-hidden={phase === "closing"}
-        >
-          <div className="mobile-menu-panel-inner">
-            <SiteNavLinks
-              menuPhase={phase}
-              onNavigate={closeMenu}
-            />
-          </div>
-        </div>
-      )}
+        <span className="sr-only">Mở menu</span>
+        <span className={barClass("-translate-y-2")} />
+        <span className={barClass("opacity-100")} />
+        <span className={barClass("translate-y-2")} />
+      </a>
+      <a
+        ref={closeToggleRef}
+        href={`#${MENU_CLOSED_HASH}`}
+        role="button"
+        aria-expanded={true}
+        aria-controls={MENU_PANEL_ID}
+        aria-label="Đóng menu"
+        className="site-header-menu-toggle site-header-menu-toggle--close relative z-20 shrink-0 items-center justify-center"
+        onClick={() => requestToggle("close")}
+      >
+        <span className="sr-only">Đóng menu</span>
+        <span className={barClass("translate-y-0 rotate-45")} />
+        <span className={barClass("opacity-0")} />
+        <span className={barClass("translate-y-0 -rotate-45")} />
+      </a>
+      {mounted ? createPortal(panel, document.body) : panel}
     </div>
   );
 }

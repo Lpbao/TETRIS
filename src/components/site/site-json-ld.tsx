@@ -1,7 +1,10 @@
-import { siteBrand, siteContact, siteSocial } from "@/lib/site-content";
+import { getSiteContact } from "@/lib/get-site-contact";
+import { siteBrand, siteSocial } from "@/lib/site-content";
 import { siteUrl } from "@/lib/site-metadata";
 
-export function SiteJsonLd() {
+export async function SiteJsonLd() {
+  const contact = await getSiteContact();
+
   const sameAs = [
     siteSocial.facebook,
     siteSocial.instagram,
@@ -14,11 +17,11 @@ export function SiteJsonLd() {
     "@type": "ProfessionalService",
     name: siteBrand.name,
     url: siteUrl,
-    email: siteContact.email,
-    telephone: siteContact.phone,
+    email: contact.email,
+    telephone: contact.phone,
     address: {
       "@type": "PostalAddress",
-      streetAddress: siteContact.address,
+      streetAddress: contact.address,
       addressLocality: "Hà Nội",
       addressCountry: "VN",
     },

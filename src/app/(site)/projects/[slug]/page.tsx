@@ -3,29 +3,32 @@ import { notFound } from "next/navigation";
 import { ProjectDetailContent } from "@/components/site/project-detail-content";
 import { ProjectDetailCover } from "@/components/site/project-detail-cover";
 import { ProjectDetailImages } from "@/components/site/project-detail-images";
-import { ProjectDetailRelated } from "@/components/site/project-detail-related";
+import { ProjectShowcase } from "@/components/site/project-showcase";
 import {
-  getProjectBySlug,
-  getProjectCover,
-  getProjectImages,
-  getRelatedProjects,
-  siteProjects,
-} from "@/lib/site-content";
+  getPublishedProjectSlugs,
+  getRelatedSiteProjects,
+  getSiteProjectBySlug,
+} from "@/lib/get-site-project";
+import { getProjectCover, getProjectImages } from "@/lib/site-content";
 import { createPageMetadata } from "@/lib/site-metadata";
 
 type ProjectDetailPageProps = {
   params: Promise<{ slug: string }>;
 };
 
+/** CMS đổi là thấy ngay — không cache trang chi tiết dự án. */
+export const dynamic = "force-dynamic";
+
 export async function generateStaticParams() {
-  return siteProjects.map((project) => ({ slug: project.slug }));
+  const slugs = await getPublishedProjectSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
   params,
 }: ProjectDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const project = getProjectBySlug(slug);
+  const project = await getSiteProjectBySlug(slug);
   if (!project) {
     return createPageMetadata({
       title: "Dự án không tồn tại",
@@ -46,14 +49,14 @@ export default async function ProjectDetailPage({
   params,
 }: ProjectDetailPageProps) {
   const { slug } = await params;
-  const project = getProjectBySlug(slug);
+  const project = await getSiteProjectBySlug(slug);
 
   if (!project) {
     notFound();
   }
 
   const images = getProjectImages(project);
-  const related = getRelatedProjects(project.slug);
+  const related = await getRelatedSiteProjects(project);
 
   return (
     <article data-project-detail>
@@ -76,7 +79,7 @@ export default async function ProjectDetailPage({
         />
       ) : null}
 
-      <ProjectDetailRelated projects={related} />
+      <ProjectShowcase projects={related} scrollEffectMode />
     </article>
   );
 }

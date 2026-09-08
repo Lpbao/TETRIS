@@ -7,15 +7,19 @@ import { ContactMapZoomControls } from "@/components/site/contact-map-zoom-contr
 import { cn } from "@/lib/utils";
 
 interface ContactMapJsSectionProps {
+  address: string;
   className?: string;
 }
 
-export function ContactMapJsSection({ className }: ContactMapJsSectionProps) {
+export function ContactMapJsSection({
+  address,
+  className,
+}: ContactMapJsSectionProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [useEmbedFallback, setUseEmbedFallback] = useState(false);
 
   if (useEmbedFallback) {
-    return <ContactMapEmbedSection className={className} />;
+    return <ContactMapEmbedSection address={address} className={className} />;
   }
 
   return (

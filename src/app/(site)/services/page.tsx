@@ -1,5 +1,5 @@
 import { ServicesPageScroll } from "@/components/site/services-page-scroll";
-import { siteServices } from "@/lib/site-content";
+import { getSiteServices } from "@/lib/get-site-services";
 import { createPageMetadata } from "@/lib/site-metadata";
 
 export const metadata = createPageMetadata({
@@ -9,6 +9,10 @@ export const metadata = createPageMetadata({
   path: "/services",
 });
 
-export default function ServicesPage() {
-  return <ServicesPageScroll services={siteServices} />;
+/** CMS đổi là thấy ngay — không cache trang dịch vụ. */
+export const dynamic = "force-dynamic";
+
+export default async function ServicesPage() {
+  const services = await getSiteServices();
+  return <ServicesPageScroll services={services} />;
 }

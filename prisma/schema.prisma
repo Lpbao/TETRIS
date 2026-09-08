@@ -12,7 +12,7 @@ datasource db {
 /// home: { slides: HeroSlide[] }
 /// about: siteAbout
 /// services: { items: SiteService[] }
-/// contact: { email, phone, address }
+/// contact: { email, phone, addressLine, province, address }
 /// projects: placeholder (list dự án = Post)
 /// @see docs/architecture/DECISIONS.md
 model SitePage {

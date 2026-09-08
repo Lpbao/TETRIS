@@ -44,32 +44,40 @@ function SiteHeaderInner({ pathname }: { pathname: string }) {
   const solidHeader = !overlayCarousel || menuActive;
 
   return (
-    <header
-      className={cn(
-        "top-0 z-50 w-full border-b transition-[background-color,border-color,backdrop-filter] duration-300 motion-reduce:transition-none",
-        isHome ? "fixed" : "sticky",
-        menuActive
-          ? "border-border/60 bg-background"
-          : solidHeader
-            ? "border-border/60 bg-background/95 backdrop-blur-sm"
-            : "border-transparent bg-transparent",
-      )}
-    >
-      <div className="site-header-bar relative z-10">
-        <SiteLogo
-          inverted={lightChrome}
-          className="site-header-logo relative z-10"
-        />
-        <div className="relative z-10 ml-auto flex items-center">
-          <DesktopNav inverted={lightChrome} />
-          <MobileNav
-            lightChrome={lightChrome}
-            open={menuOpen}
-            onOpenChange={setMenuOpen}
-            onClosingChange={setMenuClosing}
+    <>
+      {/* Header `fixed` — trang không có hero cần spacer để nội dung không bị menu che */}
+      {isHome ? null : <div aria-hidden className="site-header-spacer" />}
+      <header
+        data-menu={menuActive ? "open" : "closed"}
+        data-home-overlay={lightChrome ? "" : undefined}
+        className={cn(
+          "site-header pointer-events-auto fixed top-0 w-full border-b motion-reduce:transition-none",
+          !lightChrome &&
+            "transition-[background-color,border-color,backdrop-filter] duration-300",
+          menuActive
+            ? "border-border/60 bg-background"
+            : solidHeader
+              ? "border-border/60 bg-background/95 backdrop-blur-sm"
+              : "border-transparent",
+        )}
+      >
+        <div className="site-header-bar relative z-10">
+          <SiteLogo
+            inverted={lightChrome}
+            prefetch={!isHome}
+            className="site-header-logo relative z-10"
           />
+          <div className="relative z-10 ml-auto flex items-center">
+            <DesktopNav inverted={lightChrome} />
+            <MobileNav
+              lightChrome={lightChrome}
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              onClosingChange={setMenuClosing}
+            />
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }

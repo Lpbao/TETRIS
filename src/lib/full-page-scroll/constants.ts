@@ -21,10 +21,13 @@ export const FPS_TRANSITION_COOLDOWN_MS =
 /** Ngưỡng gesture fixed section — scroll ngắn cũng chuyển màn */
 export const FPS_FIXED_GESTURE_MIN_PX = SECTION_SWIPE_MIN;
 
-/** Inner scroll edge — dùng chung tolerance layout */
-export const FPS_INNER_SCROLL_EDGE_PX = SECTION_LAYOUT_TOLERANCE_PX;
+/** Inner scroll edge — 32px: Safari iOS gần đáy hay lệch > 8px nên extra swipe không bao giờ fire */
+export const FPS_INNER_SCROLL_EDGE_PX = 32;
 
 /** Wheel notch tối thiểu trên fixed section */
 export const FPS_WHEEL_NOTCH_MIN = 20;
+
+/** Đáy màn cuối: đứng im rồi mới show footer — khớp `--fps-footer-reveal-delay` */
+export const FPS_FOOTER_REVEAL_DELAY_MS = 100;
 
 export const PARTNERS_SCROLL_SELECTOR = "[data-partners-scroll]";
