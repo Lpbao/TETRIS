@@ -29,7 +29,8 @@ export const postSchema = z.object({
   categoryId: z.string().min(1, "Chọn category"),
   description: z.string().min(1, "Mô tả không được để trống"),
   coverImage: optionalMediaPathSchema,
-  images: z.array(mediaPathSchema).default([]),
+  /** Không dùng `.default([])` — lệch input/output làm `zodResolver` + RHF lỗi type. */
+  images: z.array(mediaPathSchema),
   published: z.boolean(),
 });
 

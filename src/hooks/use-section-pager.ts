@@ -190,10 +190,11 @@ export function useSectionPager(
   ]);
 
   const canGoPrev = useCallback(() => {
-    if (isTransitioning) return false;
-
-    /* Footer đang hiện: luôn cho đóng — không bị cooldown sau openFooter chặn (phone). */
+    /* Footer đang hiện: luôn cho đóng — check trước isTransitioning
+       (opening cũng làm isTransitioning=true, nếu đảo thứ tự thì nhánh này dead). */
     if (footerPhase === "open" || footerPhase === "opening") return true;
+
+    if (isTransitioning) return false;
 
     if (cooldownRef.current) return false;
 
@@ -299,8 +300,9 @@ export function useSectionPager(
   }, [beginCooldown, footerPhase, isTransitioning, transitionMs]);
 
   const closeFooter = useCallback((): boolean => {
-    if (isTransitioning) return false;
     if (footerPhase !== "open" && footerPhase !== "opening") return false;
+    /* Chỉ chặn khi đang slide section — không chặn lúc footer opening. */
+    if (transition !== null) return false;
 
     beginCooldown();
     if (transitionMs === 0) {
@@ -322,7 +324,7 @@ export function useSectionPager(
       });
     }, transitionMs);
     return true;
-  }, [beginCooldown, footerPhase, isTransitioning, transitionMs]);
+  }, [beginCooldown, footerPhase, transition, transitionMs]);
 
   const goNext = useCallback((): boolean => {
     if (isTransitioning || cooldownRef.current) return false;
@@ -381,11 +383,11 @@ export function useSectionPager(
   }, [beginCooldown, isTerminalReleased, isTransitioning]);
 
   const goPrev = useCallback((): boolean => {
-    if (isTransitioning) return false;
-
     if (footerPhase === "open" || footerPhase === "opening") {
       return closeFooter();
     }
+
+    if (isTransitioning) return false;
 
     if (cooldownRef.current) return false;
 

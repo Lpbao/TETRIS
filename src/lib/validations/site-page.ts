@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isVnProvince } from "@/lib/vn-provinces";
+import { VN_PROVINCES } from "@/lib/vn-provinces";
 import { mediaPathSchema } from "@/lib/validations/shared";
 
 export const SITE_PAGE_SLUGS = [
@@ -78,10 +78,10 @@ export const servicesPageSchema = z.object({
   items: z.array(siteServiceSchema).min(1, "Cần ít nhất một dịch vụ"),
 });
 
-const vnProvinceField = z
-  .string()
-  .min(1, "Chọn tỉnh / thành phố")
-  .refine((v) => isVnProvince(v), "Tỉnh / thành phố không hợp lệ");
+/** `z.enum` giữ input/output cùng type — tránh lệch Resolver với RHF + zodResolver. */
+const vnProvinceField = z.enum(VN_PROVINCES, {
+  error: "Chọn tỉnh / thành phố",
+});
 
 /** Form admin — chưa ghép `address` (ghép lúc submit). */
 export const contactPageFormSchema = z.object({
