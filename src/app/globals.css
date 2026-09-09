@@ -579,6 +579,14 @@ html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
   filter: none;
 }
 
+/* Mobile: blur-to 0.4 để text dưới ảnh (nửa dưới màn) luôn mờ; filter +
+   transform morph-pin cũng hay kẹt trên iOS Safari. Tắt blur — giữ desktop. */
+@media (pointer: coarse), (max-width: 767px) {
+  [data-about-intro] [data-scroll-blur] {
+    filter: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-about-intro] [data-scroll-blur] {
     filter: none;

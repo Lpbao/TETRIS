@@ -18,8 +18,12 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-function prefersReducedMotion() {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function shouldSkipBlur() {
+  return (
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 767px)").matches
+  );
 }
 
 function isScrollerAtBottom(scroller: HTMLElement): boolean {
@@ -67,7 +71,7 @@ export function useScrollYBlur(sectionId: string) {
 
     const sync = () => {
       const nodes = root.querySelectorAll<HTMLElement>("[data-scroll-blur]");
-      if (prefersReducedMotion()) {
+      if (shouldSkipBlur()) {
         cancelSettle();
         setSettled(true);
         clearBlur(nodes);
@@ -123,10 +127,9 @@ export function useScrollYBlur(sectionId: string) {
     };
 
     sync();
-    if (!enabled) {
+    if (!enabled || shouldSkipBlur()) {
       return () => {
         cancelSettle();
-        setSettled(false);
         if (frame) cancelAnimationFrame(frame);
       };
     }
