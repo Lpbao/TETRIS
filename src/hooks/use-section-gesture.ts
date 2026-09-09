@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import {
   getInnerScrollElForSection,
   measureInnerScroll,
@@ -103,13 +103,16 @@ export function useSectionGesture({
   targetRef,
 }: UseSectionGestureOptions) {
   const pagerRef = useRef(pager);
-  pagerRef.current = pager;
   const touchOriginRef = useRef<TouchOrigin | null>(null);
   const swipeAxisRef = useRef<SwipeAxis>(null);
   const innerScrollStartTopRef = useRef<number | null>(null);
   const innerEdgeStartRef = useRef<InnerScrollSnapshot | null>(null);
   const innerTakeoverRef = useRef(false);
   const reengagePendingRef = useRef(false);
+
+  useLayoutEffect(() => {
+    pagerRef.current = pager;
+  }, [pager]);
 
   useEffect(() => {
     const target = targetRef.current;
@@ -169,8 +172,13 @@ export function useSectionGesture({
 
       const innerEl = resolveInnerScroll(event.target, pagerRef.current);
       const startTop = innerScrollStartTopRef.current;
+      /* Mobile/coarse: để native inner scroll — takeover + morph-pin → giật/stuck. */
+      const preferNativeInnerScroll =
+        window.matchMedia("(pointer: coarse)").matches ||
+        window.matchMedia("(max-width: 767px)").matches;
 
       if (
+        !preferNativeInnerScroll &&
         innerEl &&
         startTop !== null &&
         swipeAxisRef.current === "vertical" &&
@@ -263,13 +271,19 @@ export function useSectionGesture({
         Math.abs(innerEl.scrollTop - innerScrollStartTop) >
           INNER_SCROLL_GESTURE_PX;
 
-      if (innerMoved && !startedAtBottom && !inner.isAtBottom) {
-        return;
-      }
+      /*
+       * Finger lên (deltaY < 0) = xuống nội dung / màn sau / footer.
+       * Finger xuống (deltaY > 0) = lên nội dung / màn trước.
+       * Không return sớm ở last-terminal khi deltaY > 0 — trước đây nuốt goPrev
+       * (Services panel ngắn: isAtTop && isAtBottom → mọi vuốt dính nhánh đáy).
+       */
+      if (deltaY < 0) {
+        if (innerMoved && !startedAtBottom && !inner.isAtBottom) {
+          return;
+        }
+        if (!(startedAtBottom || inner.isAtBottom)) return;
 
-      /* Màn cuối @ đáy: vuốt tiếp (finger lên) → openFooter; chưa rest thì bỏ qua. */
-      if (isLastTerminal && (startedAtBottom || inner.isAtBottom)) {
-        if (deltaY < 0) {
+        if (isLastTerminal) {
           const sectionId = p.sections[p.currentIndex]?.id;
           if (
             sectionId === "about-brand-break" &&
@@ -278,19 +292,16 @@ export function useSectionGesture({
             return;
           }
           if (p.canGoNext()) p.goNext();
+          return;
         }
+
+        p.goNext();
         return;
       }
 
-      /* Finger lên (deltaY < 0) = cuộn nội dung xuống / sang màn sau — không goPrev. */
-      if (deltaY < 0) {
-        if (startedAtBottom || inner.isAtBottom) {
-          p.goNext();
-        }
+      if (innerMoved && !startedAtTop && !inner.isAtTop) {
         return;
       }
-
-      /* Finger xuống = cuộn lên / về màn trước — chỉ khi đang ở đỉnh. */
       if (startedAtTop || inner.isAtTop) {
         p.goPrev();
       }
