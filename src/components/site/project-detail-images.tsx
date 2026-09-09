@@ -52,6 +52,7 @@ export function ProjectDetailImages({
       const wraps = root.querySelectorAll<HTMLElement>("[data-detail-imgwrap]");
 
       wraps.forEach((imageWrap) => {
+        const fxEl = imageWrap.querySelector<HTMLElement>("[data-detail-fx]");
         const imgEl = imageWrap.querySelector<HTMLElement>("[data-detail-img]");
         const left = isLeftOfViewport(imageWrap);
 
@@ -65,6 +66,7 @@ export function ProjectDetailImages({
           },
         });
 
+        /* 3D transform trên wrap — không gắn filter ở đây */
         timeline.fromTo(
           imageWrap,
           {
@@ -74,7 +76,6 @@ export function ProjectDetailImages({
             xPercent: left ? -40 : 40,
             skewX: left ? -20 : 20,
             yPercent: 80,
-            filter: "blur(6px) brightness(35%) contrast(160%)",
           },
           {
             z: 0,
@@ -83,7 +84,6 @@ export function ProjectDetailImages({
             xPercent: 0,
             skewX: 0,
             yPercent: 0,
-            filter: "blur(0px) brightness(100%) contrast(100%)",
             ease: "sine",
             duration: 1,
           },
@@ -95,10 +95,32 @@ export function ProjectDetailImages({
           rotateZ: left ? -1 : 1,
           xPercent: left ? -20 : 20,
           skewX: left ? 10 : -10,
-          filter: "blur(4px) brightness(35%) contrast(180%)",
           ease: "sine.in",
           duration: 1,
         });
+
+        /* filter tách sang [data-detail-fx] — tránh 3D + filter cùng node gây lệch */
+        if (fxEl) {
+          timeline.fromTo(
+            fxEl,
+            { filter: "blur(6px) brightness(35%) contrast(160%)" },
+            {
+              filter: "blur(0px) brightness(100%) contrast(100%)",
+              ease: "sine",
+              duration: 1,
+            },
+            0,
+          );
+          timeline.to(
+            fxEl,
+            {
+              filter: "blur(4px) brightness(35%) contrast(180%)",
+              ease: "sine.in",
+              duration: 1,
+            },
+            ">",
+          );
+        }
 
         if (imgEl) {
           timeline.fromTo(
@@ -107,7 +129,7 @@ export function ProjectDetailImages({
             { scaleY: 1, ease: "sine", duration: 1 },
             0,
           );
-          timeline.to(imgEl, { scaleY: 1.8, ease: "sine.in", duration: 1 }, ">");
+          timeline.to(imgEl, { scaleY: 1.8, ease: "sine.in", duration: 1 }, 1);
         }
       });
 
@@ -176,17 +198,19 @@ export function ProjectDetailImages({
               onClick={() => setLightboxIndex(index)}
               aria-label={`Xem ${title} — ${String(index + 1).padStart(2, "0")}`}
             >
-              <div data-detail-img className="project-detail-grid__img">
-                <SiteImage
-                  src={src}
-                  alt={`${title} — ${index + 1}`}
-                  fill
-                  blur={false}
-                  loading={index < 8 ? "eager" : "lazy"}
-                  sizes="(max-width: 1023px) 45vw, 180px"
-                  popOnHover
-                  className="object-cover"
-                />
+              <div data-detail-fx className="project-detail-grid__fx">
+                <div data-detail-img className="project-detail-grid__img">
+                  <SiteImage
+                    src={src}
+                    alt={`${title} — ${index + 1}`}
+                    fill
+                    blur={false}
+                    loading={index < 8 ? "eager" : "lazy"}
+                    sizes="(max-width: 1023px) 45vw, 180px"
+                    popOnHover
+                    className="object-cover"
+                  />
+                </div>
               </div>
             </button>
           </figure>

@@ -1677,7 +1677,8 @@ ul:has(.project-card-hover-scale) {
 .project-detail-images__veil {
   position: sticky;
   top: var(--site-header-total-height);
-  z-index: 10;
+  /* Nằm sau grid; nếu phủ trên grid sẽ tạo đường cắt ngang theo viewport. */
+  z-index: 0;
   height: calc(100dvh - var(--site-header-total-height));
   margin-bottom: calc(-1 * (100dvh - var(--site-header-total-height)));
   pointer-events: none;
@@ -1711,10 +1712,7 @@ ul:has(.project-card-hover-scale) {
 }
 
 .project-detail-images__mark {
-  position: sticky;
-  top: 50%;
-  z-index: 20;
-  height: 0;
+  display: none;
   pointer-events: none;
 }
 
@@ -1794,7 +1792,14 @@ ul:has(.project-card-hover-scale) {
   appearance: none;
   cursor: pointer;
   transform-style: preserve-3d;
-  will-change: filter, transform;
+  will-change: transform;
+}
+
+/* Filter tách layer — không cùng node 3D transform → tránh WebKit vẽ lệch */
+.project-detail-grid__fx {
+  position: absolute;
+  inset: 0;
+  will-change: filter;
 }
 
 .project-detail-grid__item:hover {
@@ -1804,6 +1809,9 @@ ul:has(.project-card-hover-scale) {
 .project-detail-grid__imgwrap:hover {
   overflow: visible;
   cursor: pointer;
+}
+
+.project-detail-grid__imgwrap:hover .project-detail-grid__fx {
   filter: brightness(1) contrast(1) blur(0) !important;
 }
 
@@ -2054,6 +2062,7 @@ ul:has(.project-card-hover-scale) {
 @media (prefers-reduced-motion: reduce) {
   .project-detail-grid__item,
   .project-detail-grid__imgwrap,
+  .project-detail-grid__fx,
   .project-detail-grid__img,
   .project-detail-related .grid__item,
   .project-detail-related .text .char {
