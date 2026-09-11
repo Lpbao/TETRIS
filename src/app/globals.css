@@ -24,24 +24,44 @@
   --radius: 0.5rem;
   --logo-default-font: "Fashion Didot W90 Regular", serif;
   --font-ui: "UTM Avo", var(--font-geist-sans), sans-serif;
-  --site-header-height: 4rem;
-  --site-header-border-width: 1px;
+  --site-header-pad-top: 25px;
+  --site-header-pad-bottom: 25px;
+  --site-header-pad-inline: 28px;
+  --site-header-logo-size: 30px;
+  --site-header-logo-tracking: 0.06em;
+  /* Khớp hit-area burger — logo box cùng cao để align-items center thẳng hàng */
+  --site-header-menu-size: 40px;
+  /* 25 + 40 + 25 = 90 — không ép height lệch pad/menu */
+  --site-header-height: calc(
+    var(--site-header-pad-top) + var(--site-header-menu-size) +
+      var(--site-header-pad-bottom)
+  );
+  --site-header-border-width: 0px;
   --site-header-safe-top: env(safe-area-inset-top, 0px);
   --site-header-total-height: calc(
     var(--site-header-safe-top) + var(--site-header-height) +
       var(--site-header-border-width)
   );
-  /* Footer: icon + copyright xếp dọc (mockup); safe-area cộng thêm */
-  --site-footer-height: 80px;
+  /* Footer — icon + ©; không animation ẩn/hiện.
+     height = icon + social-gap + copyright-line + pad-bottom (© → đáy bar = pad-bottom). */
+  --site-footer-icon-size: 32px;
+  --site-footer-copyright-line: 16px;
+  --site-footer-social-gap: 18px;
+  --site-footer-pad-bottom: 36px;
+  --site-footer-height: calc(
+    var(--site-footer-icon-size) + var(--site-footer-social-gap) +
+      var(--site-footer-copyright-line) + var(--site-footer-pad-bottom)
+  );
   --site-footer-safe-bottom: env(safe-area-inset-bottom, 0px);
   --site-footer-total-height: calc(
     var(--site-footer-height) + var(--site-footer-safe-bottom)
   );
   --site-urlbar-bottom: 0px;
-  /* Thang z: menu panel < header < overlay loading.
+  /* Thang z: menu panel < header < lightbox < overlay loading.
      Số lớn vì iOS có thể sơn layer scroll (carousel) lên trên z thấp. */
   --site-menu-panel-z: 9000;
   --site-header-z: 9010;
+  --site-lightbox-z: 9990;
   --site-loading-z: 10000;
   /* Overlay (loading) có thể cao hơn 1 màn — không dùng cho hero in-flow */
   --site-overlay-h: max(
@@ -53,12 +73,6 @@
 @media (max-width: 767px) {
   :root {
     --site-urlbar-bottom: 7rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  :root {
-    --site-header-height: 5rem;
   }
 }
 
@@ -75,7 +89,6 @@
 .site-header[data-home-overlay] {
   background-color: transparent;
   background-image: none;
-  border-bottom-color: transparent;
 }
 
 .site-header[data-home-overlay] .site-header-logo {
@@ -92,6 +105,136 @@
   height: var(--site-header-total-height);
 }
 
+/* Footer — Home + About partners; tĩnh, không border-top */
+.site-footer {
+  box-sizing: border-box;
+  height: var(--site-footer-total-height);
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.site-footer-bar {
+  box-sizing: border-box;
+  display: flex;
+  height: var(--site-footer-height);
+  max-width: 72rem;
+  margin-inline: auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--site-footer-social-gap);
+  padding-inline: 1rem;
+  padding-bottom: var(--site-footer-pad-bottom);
+}
+
+.site-footer-social {
+  display: flex;
+  height: var(--site-footer-icon-size);
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+.site-footer-copyright {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: var(--site-footer-copyright-line);
+  letter-spacing: 0.025em;
+  color: var(--muted-foreground);
+}
+
+/* Contact — info block dưới map */
+.contact-info {
+  padding-block: 3rem;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .contact-info {
+    padding-block: 4rem;
+  }
+}
+
+.contact-info-list {
+  margin-inline: auto;
+  max-width: 28rem;
+  padding-inline: 1rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.contact-info-list > * + * {
+  margin-top: 0.75rem;
+}
+
+.contact-info-label {
+  color: var(--foreground);
+}
+
+.contact-info-value {
+  font-weight: 400;
+}
+
+a.contact-info-value {
+  transition: color 150ms ease;
+}
+
+a.contact-info-value:hover {
+  color: var(--brand-red);
+}
+
+/*
+ * /contact — đẩy footer sát đáy viewport (svh: tránh pad footer dưới fold trên iOS).
+ * Khoảng trống nằm giữa contact-info và footer (`margin-top: auto`).
+ */
+[data-contact-page] {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100svh - var(--site-header-total-height));
+}
+
+[data-contact-page] > .site-footer {
+  margin-top: auto;
+}
+
+/*
+ * /projects — đẩy cả khối footer (kể pad-bottom) sát đáy viewport nhìn thấy.
+ * Dùng 100svh (không 100dvh): tránh © chạm đáy trong khi pad footer nằm dưới fold.
+ * Chỉ [data-projects-page] [data-project-cover] — không đụng Home.
+ */
+[data-projects-page] {
+  --projects-filter-nav-height: 5.25rem; /* 84px: py-5 + min-h-11 */
+  --projects-grid-pad-y: 3rem; /* py-6 × 2 */
+  /* Mobile pagination flex-col: status + gap + controls + py-4 */
+  --projects-pagination-block: 6rem;
+  --projects-footer-gap: 92px;
+}
+
+@media (min-width: 640px) {
+  [data-projects-page] {
+    /* sm+: pagination 1 hàng */
+    --projects-pagination-block: 4rem;
+  }
+}
+
+@media (min-width: 768px) {
+  [data-projects-page] {
+    --projects-filter-nav-height: 5.75rem; /* 92px: py-6 + min-h-11 */
+    --projects-grid-pad-y: 4rem; /* py-8 × 2 */
+  }
+}
+
+[data-projects-page] [data-project-cover] {
+  min-height: calc(
+    100svh - var(--site-header-total-height) -
+      var(--projects-filter-nav-height) - var(--projects-grid-pad-y) -
+      var(--projects-pagination-block) - var(--projects-footer-gap) -
+      var(--site-footer-total-height)
+  );
+}
+
 /* Site header bar — pixel-lock; đổi height chỉ qua --site-header-height */
 .site-header-bar {
   display: flex;
@@ -99,7 +242,8 @@
   width: 100%;
   max-width: 72rem;
   margin-inline: auto;
-  padding-inline: 1rem;
+  padding: var(--site-header-pad-top) var(--site-header-pad-inline)
+    var(--site-header-pad-bottom);
   height: var(--site-header-height);
   min-height: var(--site-header-height);
   max-height: var(--site-header-height);
@@ -107,28 +251,39 @@
 }
 
 .site-header-logo {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  height: var(--site-header-menu-size);
+  min-height: var(--site-header-menu-size);
   font-family: var(--logo-default-font);
-  line-height: 1.25;
-  /* Cố định chiều cao dòng — tránh nhảy khi đổi màu / font render */
-  min-height: calc(1.25 * 1rem);
+  font-size: var(--site-header-logo-size);
+  letter-spacing: var(--site-header-logo-tracking);
+  line-height: 1;
+  box-sizing: border-box;
 }
 
-@media (min-width: 1024px) {
-  .site-header-logo {
-    min-height: calc(1.25 * 1.125rem);
-  }
+/* Fashion Didot: caps nằm cao trong em — dịch xuống khớp tâm burger/X */
+.site-header-logo-label {
+  display: block;
+  line-height: 1;
+  transform: translateY(0.28em);
 }
 
 .site-header-menu-toggle {
   flex-shrink: 0;
-  width: 2.5rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
+  width: var(--site-header-menu-size);
+  height: var(--site-header-menu-size);
+  min-width: var(--site-header-menu-size);
+  min-height: var(--site-header-menu-size);
   touch-action: manipulation;
   pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
+}
+
+.site-header-menu-toggle > span:not(.sr-only) {
+  height: 2px;
+  border-radius: 8px;
 }
 
 .site-header-menu-toggle--close {
@@ -149,7 +304,6 @@ html:has(#site-mobile-menu:target) .site-header-menu-toggle--close {
 .site-header[data-menu="open"],
 html:has(#site-mobile-menu:target) .site-header {
   background-color: var(--background);
-  border-bottom-color: color-mix(in oklab, var(--border) 60%, transparent);
 }
 
 .site-header[data-menu="open"] .site-header-logo,
@@ -253,17 +407,8 @@ select {
 }
 
 /* Full-page scroll — virtual pager */
-[data-full-page-scroll] {
-  --fps-footer-reveal-delay: 0.1s;
-}
-
 html:has([data-full-page-scroll-active]) {
   overflow: hidden;
-}
-
-/* Chỉ ContentPartner (terminal release) được hiện cùng footer — ẩn footer khi đang paging */
-html:has([data-full-page-scroll-active]) #site-footer {
-  display: none;
 }
 
 html:has([data-full-page-scroll-active]) main {
@@ -282,65 +427,6 @@ html:has([data-full-page-scroll-active]) main {
   }
 }
 
-html:has([data-fps-released]) {
-  height: 100dvh;
-  overflow: hidden;
-  scroll-padding-top: var(--site-header-total-height);
-}
-
-html:has([data-fps-released]) body {
-  height: 100dvh;
-  min-height: 100dvh;
-  overflow: hidden;
-}
-
-@media (pointer: coarse), (max-width: 767px) {
-  html:has([data-fps-released]),
-  html:has([data-fps-released]) body {
-    height: 100svh;
-  }
-
-  html:has([data-fps-released]) body {
-    min-height: 100svh;
-  }
-}
-
-html:has([data-fps-released]) main {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  height: auto;
-  max-height: none;
-  overflow: hidden;
-}
-
-html:has([data-fps-released]) [data-full-page-scroll] {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-html:has([data-fps-released]) [data-fps-viewport] {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-html:has([data-fps-released]) [data-section-chain-terminal] {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-html:has([data-fps-released]) [data-section-chain-terminal] [data-fps-inner-scroll] {
-  flex: 1 1 0;
-  min-height: 0;
-}
-
 /* Một scroll-port duy nhất. overflow-x trên [data-morph-pin] khiến WebKit
    biến khối đó thành scroller lồng (overflow-y tính thành auto) — iOS nuốt
    touch, parent không cuộn, kẹt hero không tới brand-break. */
@@ -350,19 +436,6 @@ html:has([data-fps-released]) [data-section-chain-terminal] [data-fps-inner-scro
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-}
-
-html:has([data-fps-released]) #site-footer {
-  flex-shrink: 0;
-}
-
-/* Footer — icon + © xếp dọc; không border-top; Contact: tĩnh full height */
-.site-footer {
-  box-sizing: border-box;
-  height: var(--site-footer-total-height);
-  flex-shrink: 0;
-  overflow: hidden;
-  background: var(--background);
 }
 
 @keyframes fps-panel-enter {
@@ -457,89 +530,6 @@ html:has([data-fps-released]) #site-footer {
   overflow: hidden;
 }
 
-@keyframes fps-footer-enter {
-  from {
-    height: 0;
-  }
-  to {
-    height: var(--site-footer-total-height);
-  }
-}
-
-@keyframes fps-footer-exit {
-  from {
-    height: var(--site-footer-total-height);
-  }
-  to {
-    height: 0;
-  }
-}
-
-/* Slide: hiện #site-footer bằng layout released. Height 0 ↔ total (không translateY). */
-html:has([data-fps-effect="slide"][data-fps-released]) #site-footer {
-  flex-shrink: 0;
-  z-index: 40;
-  height: var(--site-footer-total-height);
-  overflow: hidden;
-}
-
-html:has([data-fps-effect="slide"][data-fps-footer="opening"]) #site-footer {
-  animation: fps-footer-enter var(--fps-transition-ms, 700ms)
-    var(--fps-slide-easing, cubic-bezier(0.645, 0.045, 0.355, 1)) both;
-}
-
-html:has([data-fps-effect="slide"][data-fps-footer="closing"]) #site-footer {
-  animation: fps-footer-exit var(--fps-transition-ms, 700ms)
-    var(--fps-slide-easing, cubic-bezier(0.645, 0.045, 0.355, 1)) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html:has([data-fps-effect="slide"][data-fps-footer="opening"]) #site-footer {
-    animation: none;
-    height: var(--site-footer-total-height);
-  }
-
-  html:has([data-fps-effect="slide"][data-fps-footer="closing"]) #site-footer {
-    animation: none;
-    height: 0;
-  }
-}
-
-/* Home: ẩn footer đến extra swipe/wheel ở đáy `#home-projects` (giống About terminal). */
-html:has(#hero-carousel)[data-home-footer="closed"] #site-footer {
-  display: none;
-}
-
-html:has(#hero-carousel)[data-home-footer="opening"] #site-footer,
-html:has(#hero-carousel)[data-home-footer="open"] #site-footer,
-html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
-  z-index: 40;
-  height: var(--site-footer-total-height);
-  overflow: hidden;
-}
-
-html:has(#hero-carousel)[data-home-footer="opening"] #site-footer {
-  animation: fps-footer-enter var(--fps-transition-ms, 700ms)
-    var(--fps-slide-easing, cubic-bezier(0.645, 0.045, 0.355, 1)) both;
-}
-
-html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
-  animation: fps-footer-exit var(--fps-transition-ms, 700ms)
-    var(--fps-slide-easing, cubic-bezier(0.645, 0.045, 0.355, 1)) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html:has(#hero-carousel)[data-home-footer="opening"] #site-footer {
-    animation: none;
-    height: var(--site-footer-total-height);
-  }
-
-  html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
-    animation: none;
-    height: 0;
-  }
-}
-
 /* About intro/awards — blur theo inner scroll Y (không moving letters) */
 [data-about-intro] {
   --about-scroll-blur: 16px;
@@ -565,6 +555,11 @@ html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
 
 [data-about-intro] [data-ml11-body] ul {
   margin-top: 8px;
+}
+
+/* Intro ↔ awards: 24px (pb-4+pt-2) + 12px */
+#about-awards {
+  margin-top: 12px;
 }
 
 [data-about-intro] [data-scroll-blur] {
@@ -739,6 +734,21 @@ html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
   }
 }
 
+/* Partners Swiper marquee — linear continuous; scoped (không đụng Swiper khác) */
+[data-partners-scroll] {
+  --swiper-wrapper-transition-timing-function: linear;
+}
+
+[data-partners-scroll] .swiper-wrapper {
+  transition-timing-function: linear !important;
+}
+
+[data-partners-scroll] .swiper-slide {
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 /* Moving Letters #2 — journey/partners h2; scale 4→1 + fade, play once
    https://tobiasahlin.com/moving-letters/#2 */
@@ -978,7 +988,7 @@ html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
   --brand-break-enter-stagger: 0.12s;
 }
 
-/* Chưa rest: khóa letter exit — tránh vuốt sớm / footer giả làm mất logo trước enter */
+/* Chưa rest: khóa letter exit — tránh vuốt sớm làm mất logo trước enter */
 [data-brand-break]:not([data-brand-break-logo="rest"]) {
   --morph-pin-p-letter: 0 !important;
   --morph-pin-letter-x: 0px !important;
@@ -1013,7 +1023,7 @@ html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
   [data-about-hero-morph] {
     --morph-pin-align-speed: 3.2;
     --morph-pin-shrink-speed: 0.85;
-    --morph-pin-title-gap: 16px;
+    --morph-pin-title-gap: 50px;
   }
 }
 
@@ -1088,6 +1098,11 @@ html:has(#hero-carousel)[data-home-footer="closing"] #site-footer {
   z-index: 1;
   transform: translateY(var(--morph-pin-content-shift, 0px));
   will-change: transform;
+}
+
+/* Chỉ bù khi flow (shift đã freeze) — tránh co scrollHeight giữa align → kẹt momentum */
+[data-morph-pin-phase="flow"] [data-morph-pin-content] {
+  margin-bottom: min(0px, var(--morph-pin-content-shift, 0px));
 }
 
 [data-logo-component] {
@@ -1231,14 +1246,82 @@ html:has(#hero-carousel) body {
 #home-projects {
   /* Cổng reveal: scroll tới 50% màn hình thực (JS đọc token) */
   --home-project-gate-scroll-ratio: 0.5;
+  /* Fit ~3.25 hàng (3 full + peek hàng 4) trong 1 viewport dưới header — mobile */
+  --home-projects-visible-rows: 3.25;
+  --home-projects-gap-x: 0.5rem;
+  --home-projects-gap-y: 0.75rem;
+  --home-projects-caption-h: 2.5rem;
+  --home-projects-pad-top: 48px;
+  --home-projects-pad-bottom: 0px;
+  --home-projects-pad-inline: 30px;
+  --home-projects-list-mt: 0px;
+  --home-projects-media-h: calc(
+    (
+        100lvh - var(--site-header-total-height) - var(--home-projects-pad-top) -
+          var(--home-projects-pad-bottom) - var(--home-projects-list-mt) -
+          (var(--home-projects-visible-rows) - 1) * var(--home-projects-gap-y) -
+          var(--home-projects-visible-rows) * var(--home-projects-caption-h)
+      ) / var(--home-projects-visible-rows)
+  );
+  --home-projects-card-h: calc(
+    var(--home-projects-media-h) + var(--home-projects-caption-h)
+  );
   position: relative;
   z-index: 1;
   background: var(--brand-white);
+  padding: var(--home-projects-pad-top) var(--home-projects-pad-inline)
+    var(--home-projects-pad-bottom);
+  box-sizing: border-box;
 }
 
 #home-projects[data-home-section="projects"] {
   min-height: calc(100vh - var(--site-header-total-height));
   min-height: calc(100lvh - var(--site-header-total-height));
+}
+
+/* Home grid: thu card để vừa --home-projects-visible-rows hàng */
+#home-projects [data-project-cover] {
+  margin-top: var(--home-projects-list-mt);
+  /* Đáy list = đúng chiều cao 2 card li (media + caption) */
+  margin-bottom: calc(1.5 * var(--home-projects-card-h));
+  gap: var(--home-projects-gap-y) var(--home-projects-gap-x);
+  align-content: start;
+}
+
+#home-projects [data-project-cover] [data-project-card-media] {
+  aspect-ratio: auto;
+  height: var(--home-projects-media-h);
+}
+
+#home-projects [data-project-cover] [data-section-title],
+#home-projects [data-project-cover] h3 {
+  margin-top: 0.35rem;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+#home-projects [data-project-cover] p {
+  margin-top: 0.15rem;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+@media (min-width: 768px) {
+  #home-projects {
+    /* md+: 3 cột → 6 item = 2 hàng */
+    --home-projects-visible-rows: 2;
+    --home-projects-gap-x: 1rem;
+    --home-projects-gap-y: 1.25rem;
+    --home-projects-caption-h: 3rem;
+  }
+
+  #home-projects [data-project-cover] h3 {
+    font-size: 13px;
+  }
+
+  #home-projects [data-project-cover] p {
+    font-size: 11px;
+  }
 }
 
 [data-hero-caption] {
@@ -1549,6 +1632,40 @@ ul:has(.project-card-hover-scale) {
   letter-spacing: var(--service-section-title-tracking);
 }
 
+/*
+ * /services — màn cuối: copy (h2+p) min-height đẩy khối footer sát đáy viewport.
+ * 100svh — tránh chỉ © chạm đáy khi pad footer dưới fold.
+ */
+[data-services-last] {
+  --services-section-pad-top: 38px;
+  --services-section-gap: 32px;
+  --services-pad-inline: 28px;
+  --services-footer-gap: 92px;
+  box-sizing: border-box;
+  min-height: calc(100svh - var(--site-header-total-height));
+}
+
+/* Mobile: ảnh xếp trên copy — trừ chiều ảnh aspect 4/3 */
+[data-services-last] [data-service-copy] {
+  min-height: calc(
+    100svh - var(--site-header-total-height) -
+      var(--services-section-pad-top) - var(--services-section-gap) -
+      ((100vw - 2 * var(--services-pad-inline)) * 3 / 4) -
+      var(--services-footer-gap) - var(--site-footer-total-height)
+  );
+}
+
+@media (min-width: 768px) {
+  /* Desktop 2 cột: không trừ chiều ảnh khỏi trục dọc trước footer */
+  [data-services-last] [data-service-copy] {
+    min-height: calc(
+      100svh - var(--site-header-total-height) -
+        var(--services-section-pad-top) - var(--services-footer-gap) -
+        var(--site-footer-total-height)
+    );
+  }
+}
+
 [data-focus-in-expand="out"] img,
 [data-focus-in-expand="out"] h2,
 [data-focus-in-expand="out"] p {
@@ -1857,11 +1974,17 @@ ul:has(.project-card-hover-scale) {
 .project-detail-lightbox {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  /* Dưới loading, trên header/menu — --site-lightbox-z */
+  z-index: var(--site-lightbox-z);
   display: grid;
   place-items: center;
   background: #000;
   color: #fff;
+}
+
+/* Khi lightbox mở: khóa tương tác header — tránh click close lọt xuống nút menu */
+html[data-lightbox-open] .site-header {
+  pointer-events: none;
 }
 
 .project-detail-lightbox__stage {
@@ -1899,8 +2022,10 @@ ul:has(.project-card-hover-scale) {
 }
 
 .project-detail-lightbox__close {
-  top: max(0.75rem, env(safe-area-inset-top));
+  top: calc(max(0.75rem, env(safe-area-inset-top)) + 30px);
   right: max(0.75rem, env(safe-area-inset-right));
+  color: #fff !important;
+  opacity: 1;
 }
 
 .project-detail-lightbox__nav--prev {
@@ -2072,7 +2197,7 @@ ul:has(.project-card-hover-scale) {
   }
 }
 
-/* Site loading — 3 khối full viewport → logo 10vw giữa màn → flicker */
+/* Site loading — logo 3 khối 10vw giữa màn (không cover/shrink/flicker) */
 [data-site-loading] {
   --sl-bg: var(--brand-white);
   --sl-block: var(--brand-red);
@@ -2080,11 +2205,7 @@ ul:has(.project-card-hover-scale) {
   --sl-logo-h: calc(var(--sl-logo-w) * var(--sl-sum-h) / var(--sl-sum-w));
   --sl-logo-left: calc(50% - var(--sl-logo-w) / 2);
   --sl-logo-top: calc(50% - var(--sl-logo-h) / 2);
-  --sl-cover-gap: 8px;
-  --sl-hold-ms: 1s;
-  --sl-shrink-ms: 1.1s;
-  --sl-shrink-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --sl-flicker-ms: 0.84s;
+  --sl-autodismiss-ms: 0.6s;
   position: fixed;
   top: 0;
   left: 0;
@@ -2101,12 +2222,10 @@ ul:has(.project-card-hover-scale) {
   pointer-events: none;
 }
 
-/* Intro/overlay: ẩn sau sequence dù JS chưa hydrate (LAN / thiết bị khác) */
+/* Intro/overlay: ẩn sau hold ngắn dù JS chưa hydrate */
 [data-site-loading-autodismiss] {
   animation: site-loading-autodismiss 1ms linear forwards;
-  animation-delay: calc(
-    var(--sl-hold-ms) + var(--sl-shrink-ms) + var(--sl-flicker-ms)
-  );
+  animation-delay: var(--sl-autodismiss-ms);
 }
 
 @keyframes site-loading-autodismiss {
@@ -2120,143 +2239,40 @@ ul:has(.project-card-hover-scale) {
 [data-site-loading-block] {
   position: absolute;
   background: var(--sl-block);
-  animation-duration: var(--sl-shrink-ms), var(--sl-flicker-ms);
-  animation-timing-function: var(--sl-shrink-ease), steps(1, end);
-  animation-iteration-count: 1, infinite;
-  animation-delay: var(--sl-hold-ms), calc(var(--sl-hold-ms) + var(--sl-shrink-ms));
-  animation-fill-mode: forwards, none;
 }
 
 [data-site-loading-block="top"] {
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: calc(
-    (100% - 2 * var(--sl-cover-gap)) * var(--sl-cover-r-top) /
-      var(--sl-cover-r-sum)
-  );
-  animation-name: site-loading-shrink-top, site-loading-flicker;
+  top: var(--sl-logo-top);
+  left: var(--sl-logo-left);
+  width: calc(var(--sl-logo-w) * var(--sl-w-top) / var(--sl-sum-w));
+  height: calc(var(--sl-logo-h) * var(--sl-h-top) / var(--sl-sum-h));
 }
 
 [data-site-loading-block="mid"] {
   top: calc(
-    (100% - 2 * var(--sl-cover-gap)) * var(--sl-cover-r-top) /
-      var(--sl-cover-r-sum) + var(--sl-cover-gap)
+    var(--sl-logo-top) + var(--sl-logo-h) * var(--sl-h-top) / var(--sl-sum-h)
   );
-  left: 0;
-  width: 100%;
-  height: calc(
-    (100% - 2 * var(--sl-cover-gap)) * var(--sl-cover-r-mid) /
-      var(--sl-cover-r-sum)
+  left: calc(
+    var(--sl-logo-left) + var(--sl-logo-w) * var(--sl-x-mid) / var(--sl-sum-w)
   );
-  animation-name: site-loading-shrink-mid, site-loading-flicker;
+  width: calc(var(--sl-logo-w) * var(--sl-w-mid) / var(--sl-sum-w));
+  height: calc(var(--sl-logo-h) * var(--sl-h-mid) / var(--sl-sum-h));
 }
 
 [data-site-loading-block="bot"] {
   top: calc(
-    (100% - 2 * var(--sl-cover-gap)) *
-      (var(--sl-cover-r-top) + var(--sl-cover-r-mid)) / var(--sl-cover-r-sum) +
-      2 * var(--sl-cover-gap)
+    var(--sl-logo-top) + var(--sl-logo-h) * (var(--sl-h-top) + var(--sl-h-mid)) /
+      var(--sl-sum-h)
   );
-  left: 0;
-  width: 100%;
-  height: calc(
-    (100% - 2 * var(--sl-cover-gap)) * var(--sl-cover-r-bot) /
-      var(--sl-cover-r-sum)
+  left: calc(
+    var(--sl-logo-left) + var(--sl-logo-w) * var(--sl-x-bot) / var(--sl-sum-w)
   );
-  animation-name: site-loading-shrink-bot, site-loading-flicker;
-}
-
-@keyframes site-loading-shrink-top {
-  to {
-    top: var(--sl-logo-top);
-    left: var(--sl-logo-left);
-    width: calc(var(--sl-logo-w) * var(--sl-w-top) / var(--sl-sum-w));
-    height: calc(var(--sl-logo-h) * var(--sl-h-top) / var(--sl-sum-h));
-  }
-}
-
-@keyframes site-loading-shrink-mid {
-  to {
-    top: calc(
-      var(--sl-logo-top) + var(--sl-logo-h) * var(--sl-h-top) / var(--sl-sum-h)
-    );
-    left: calc(
-      var(--sl-logo-left) + var(--sl-logo-w) * var(--sl-x-mid) / var(--sl-sum-w)
-    );
-    width: calc(var(--sl-logo-w) * var(--sl-w-mid) / var(--sl-sum-w));
-    height: calc(var(--sl-logo-h) * var(--sl-h-mid) / var(--sl-sum-h));
-  }
-}
-
-@keyframes site-loading-shrink-bot {
-  to {
-    top: calc(
-      var(--sl-logo-top) + var(--sl-logo-h) * (var(--sl-h-top) + var(--sl-h-mid)) /
-        var(--sl-sum-h)
-    );
-    left: calc(
-      var(--sl-logo-left) + var(--sl-logo-w) * var(--sl-x-bot) / var(--sl-sum-w)
-    );
-    width: calc(var(--sl-logo-w) * var(--sl-w-bot) / var(--sl-sum-w));
-    height: calc(var(--sl-logo-h) * var(--sl-h-bot) / var(--sl-sum-h));
-  }
-}
-
-@keyframes site-loading-flicker {
-  0%,
-  9%,
-  11%,
-  39%,
-  43%,
-  69%,
-  73%,
-  100% {
-    opacity: 1;
-  }
-  10%,
-  40%,
-  70% {
-    opacity: 0.18;
-  }
+  width: calc(var(--sl-logo-w) * var(--sl-w-bot) / var(--sl-sum-w));
+  height: calc(var(--sl-logo-h) * var(--sl-h-bot) / var(--sl-sum-h));
 }
 
 @media (prefers-reduced-motion: reduce) {
   [data-site-loading-autodismiss] {
     animation-delay: 0s;
-  }
-
-  [data-site-loading-block] {
-    animation: none;
-  }
-
-  [data-site-loading-block="top"] {
-    top: var(--sl-logo-top);
-    left: var(--sl-logo-left);
-    width: calc(var(--sl-logo-w) * var(--sl-w-top) / var(--sl-sum-w));
-    height: calc(var(--sl-logo-h) * var(--sl-h-top) / var(--sl-sum-h));
-  }
-
-  [data-site-loading-block="mid"] {
-    top: calc(
-      var(--sl-logo-top) + var(--sl-logo-h) * var(--sl-h-top) / var(--sl-sum-h)
-    );
-    left: calc(
-      var(--sl-logo-left) + var(--sl-logo-w) * var(--sl-x-mid) / var(--sl-sum-w)
-    );
-    width: calc(var(--sl-logo-w) * var(--sl-w-mid) / var(--sl-sum-w));
-    height: calc(var(--sl-logo-h) * var(--sl-h-mid) / var(--sl-sum-h));
-  }
-
-  [data-site-loading-block="bot"] {
-    top: calc(
-      var(--sl-logo-top) + var(--sl-logo-h) * (var(--sl-h-top) + var(--sl-h-mid)) /
-        var(--sl-sum-h)
-    );
-    left: calc(
-      var(--sl-logo-left) + var(--sl-logo-w) * var(--sl-x-bot) / var(--sl-sum-w)
-    );
-    width: calc(var(--sl-logo-w) * var(--sl-w-bot) / var(--sl-sum-w));
-    height: calc(var(--sl-logo-h) * var(--sl-h-bot) / var(--sl-sum-h));
   }
 }

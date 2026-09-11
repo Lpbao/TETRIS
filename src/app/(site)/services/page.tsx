@@ -1,4 +1,5 @@
 import { ServicesPageScroll } from "@/components/site/services-page-scroll";
+import { getSiteContact } from "@/lib/get-site-contact";
 import { getSiteServices } from "@/lib/get-site-services";
 import { createPageMetadata } from "@/lib/site-metadata";
 
@@ -13,6 +14,9 @@ export const metadata = createPageMetadata({
 export const dynamic = "force-dynamic";
 
 export default async function ServicesPage() {
-  const services = await getSiteServices();
-  return <ServicesPageScroll services={services} />;
+  const [services, contact] = await Promise.all([
+    getSiteServices(),
+    getSiteContact(),
+  ]);
+  return <ServicesPageScroll services={services} contact={contact} />;
 }

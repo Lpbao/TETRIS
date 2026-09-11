@@ -50,7 +50,7 @@ export function ContentSection({
         data-section-title=""
         data-ml7-heading={movingLetters ? "" : undefined}
         data-ml2-heading={headingEffect === "ml2" ? "" : undefined}
-        className="text-sm font-bold uppercase"
+        className="text-sm uppercase"
       >
         {scrollBlur ? <span data-scroll-blur="">{titleNode}</span> : titleNode}
       </h2>
@@ -59,7 +59,7 @@ export function ContentSection({
         data-ml9-body={movingLetters ? "" : undefined}
         data-text-focus-in={bodyEffect === "text-focus-in" ? "" : undefined}
         data-scroll-blur={scrollBlur ? "" : undefined}
-        className={cn("mt-6 space-y-4", bodyClassName)}
+        className={cn("mt-[18px] space-y-4", bodyClassName)}
       >
         {paragraphs.map((paragraph) => (
           <p

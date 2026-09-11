@@ -41,7 +41,7 @@ export function HomeProjectCurtainList({
   const listRef = useRef<HTMLUListElement>(null);
   const sectionReadyRef = useRef(false);
   const [sectionReady, setSectionReady] = useState(false);
-  const [headerOffset, setHeaderOffset] = useState(64);
+  const [headerOffset, setHeaderOffset] = useState(91);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [enterTogether, setEnterTogether] = useState(false);
 

@@ -24,6 +24,7 @@ export function ProjectCard({
 
   const media = (
     <div
+      data-project-card-media=""
       className={cn(
         "relative w-full overflow-hidden bg-background",
         isHome ? "aspect-[4/5]" : "aspect-square",
@@ -36,7 +37,7 @@ export function ProjectCard({
         className={cn(
           "object-contain object-center",
           isGallery && "transition-transform duration-300 group-hover:scale-[1.02]",
-          isHome ? "p-1 md:p-3" : "p-4",
+          isHome ? "p-4 md:p-6" : isGallery ? "p-4" : "p-7",
         )}
         sizes="(max-width: 768px) 50vw, 25vw"
       />

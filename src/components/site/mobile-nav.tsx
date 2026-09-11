@@ -313,7 +313,7 @@ export function MobileNav({
 
   const barClass = (extra: string) =>
     cn(
-      "absolute block h-px w-6 transition-all duration-300 motion-reduce:transition-none",
+      "absolute block h-[2px] w-6 rounded-[8px] transition-all duration-300 motion-reduce:transition-none",
       iconTone,
       extra,
     );

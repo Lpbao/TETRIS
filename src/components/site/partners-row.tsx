@@ -1,6 +1,13 @@
+"use client";
+
 import Image from "next/image";
 import { MovingLettersPop } from "@/components/site/moving-letters";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
+import { Autoplay, FreeMode } from "swiper/modules";
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/css";
+import "swiper/css/free-mode";
 
 interface Partner {
   name: string;
@@ -17,6 +24,34 @@ interface PartnersRowProps {
   forceLettersPlay?: boolean;
 }
 
+const SLIDES_PER_VIEW = 3;
+/** Loop + 3 visible cần đủ slide clones — nhân bản khi danh sách ngắn. */
+const MIN_LOOP_SLIDES = SLIDES_PER_VIEW * 2;
+
+function buildLoopSlides(partners: readonly Partner[]): Partner[] {
+  if (partners.length === 0) return [];
+  if (partners.length >= MIN_LOOP_SLIDES) return [...partners];
+  const slides: Partner[] = [];
+  while (slides.length < MIN_LOOP_SLIDES) {
+    slides.push(...partners);
+  }
+  return slides;
+}
+
+function PartnerLogo({ name, logo }: Partner) {
+  return (
+    <div className="relative h-16 w-full md:h-24 lg:h-28">
+      <Image
+        src={logo}
+        alt={name}
+        fill
+        className="object-contain object-center"
+        sizes="(min-width: 1024px) 200px, (min-width: 768px) 160px, 30vw"
+      />
+    </div>
+  );
+}
+
 export function PartnersRow({
   title,
   partners,
@@ -26,6 +61,10 @@ export function PartnersRow({
   lettersSectionId = "about-brand-break",
   forceLettersPlay = false,
 }: PartnersRowProps) {
+  const reducedMotion = usePrefersReducedMotion();
+  const loopSlides = buildLoopSlides(partners);
+  const useMarquee = !reducedMotion && loopSlides.length > 0;
+
   return (
     <section className={cn("py-12 pb-16", className)}>
       <h2
@@ -43,28 +82,72 @@ export function PartnersRow({
           title
         )}
       </h2>
-      <ul
-        data-section-body=""
-        data-text-focus-in={logoEffect === "text-focus-in" ? "" : undefined}
-        className="mt-10 grid grid-cols-3 items-center justify-items-center gap-6 md:mt-12 md:gap-16"
-      >
-        {partners.map((partner) => (
-          <li
-            key={partner.name}
-            className="flex w-full items-center justify-center"
+
+      {partners.length === 0 ? null : useMarquee ? (
+        <div
+          data-partners-scroll=""
+          className="partners-marquee mt-10 md:mt-12"
+        >
+          <Swiper
+            modules={[Autoplay, FreeMode]}
+            className="w-full"
+            wrapperTag="ul"
+            slidesPerView={SLIDES_PER_VIEW}
+            spaceBetween={24}
+            breakpoints={{
+              768: { spaceBetween: 64 },
+            }}
+            loop
+            speed={6000}
+            allowTouchMove
+            simulateTouch
+            grabCursor
+            freeMode={{
+              enabled: true,
+              momentum: false,
+            }}
+            autoplay={{
+              delay: 0,
+              disableOnInteraction: false,
+              pauseOnMouseEnter: false,
+            }}
+            watchSlidesProgress
+            data-partners-logos=""
+            data-section-body=""
+            data-text-focus-in={logoEffect === "text-focus-in" ? "" : undefined}
+            aria-label={title}
+            onTouchEnd={(swiper) => {
+              if (!swiper.autoplay.running) swiper.autoplay.start();
+            }}
           >
-            <div className="relative h-16 w-full md:h-24 lg:h-28">
-              <Image
-                src={partner.logo}
-                alt={partner.name}
-                fill
-                className="object-contain object-center"
-                sizes="(min-width: 1024px) 200px, (min-width: 768px) 160px, 30vw"
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
+            {loopSlides.map((partner, index) => (
+              <SwiperSlide
+                key={`${partner.name}-${index}`}
+                tag="li"
+                className="!flex items-center justify-center"
+              >
+                <PartnerLogo {...partner} />
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        </div>
+      ) : (
+        <ul
+          data-partners-logos=""
+          data-section-body=""
+          data-text-focus-in={logoEffect === "text-focus-in" ? "" : undefined}
+          className="mt-10 grid grid-cols-3 items-center justify-items-center gap-6 md:mt-12 md:gap-16"
+        >
+          {partners.map((partner) => (
+            <li
+              key={partner.name}
+              className="flex w-full items-center justify-center"
+            >
+              <PartnerLogo {...partner} />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

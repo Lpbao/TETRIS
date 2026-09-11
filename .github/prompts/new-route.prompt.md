@@ -10,7 +10,7 @@ Kind: **${input:kind:site or admin}** (`site` | `admin`).
 
 ## site
 
-- File: `src/app/(site)/{segments}/page.tsx` — inherits `SiteJsonLd` / `SiteHeader` / `SiteFooter`. Do not render them again.
+- File: `src/app/(site)/{segments}/page.tsx` — inherits `SiteJsonLd` / `SiteHeader`. Do not render them again.
 - `export const metadata = createPageMetadata({ title, description, path })`.
 - Default-export Server Component. Load data in the page (`site-content`, `getHomeHeroSlides` / `getSiteAbout` / `getSiteServices` / `getSiteProjectBySlug`, or Prisma); pass props to `src/components/site/…`.
 - If the URL is `/`, `/about`, `/projects`, or `/services` (or a new full-page landing), sections must fill the viewport: `FullPageScrollRoot` + `src/lib/{page}-section-config.ts`, **or** Home's `home-scroll.ts` — never both.

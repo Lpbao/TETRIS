@@ -28,57 +28,13 @@
   }
 
   function rootEl() {
-    return (
-      document.querySelector("[data-full-page-scroll-active]") ||
-      document.querySelector("[data-full-page-scroll][data-fps-released]")
-    );
+    return document.querySelector("[data-full-page-scroll-active]");
   }
 
   function panelList() {
     var root = rootEl();
     if (!root) return [];
     return root.querySelectorAll("[data-fps-panel]");
-  }
-
-  function isReleased() {
-    var root = document.querySelector(
-      "[data-full-page-scroll][data-fps-released]",
-    );
-    return !!root;
-  }
-
-  function releaseFooter() {
-    var root = document.querySelector("[data-full-page-scroll-active]");
-    if (!root || busy) return;
-    var brand = document.querySelector("[data-brand-break]");
-    if (
-      brand &&
-      brand.getAttribute("data-brand-break-logo") &&
-      brand.getAttribute("data-brand-break-logo") !== "rest"
-    ) {
-      return;
-    }
-    busy = true;
-    root.removeAttribute("data-full-page-scroll-active");
-    root.setAttribute("data-fps-released", "");
-    root.setAttribute("data-fps-footer", "open");
-    window.setTimeout(function () {
-      busy = false;
-    }, TRANSITION_MS);
-  }
-
-  function closeFooterNative() {
-    var root = document.querySelector(
-      "[data-full-page-scroll][data-fps-released]",
-    );
-    if (!root || busy) return;
-    busy = true;
-    root.removeAttribute("data-fps-released");
-    root.setAttribute("data-full-page-scroll-active", "");
-    root.setAttribute("data-fps-footer", "closed");
-    window.setTimeout(function () {
-      busy = false;
-    }, TRANSITION_MS);
   }
 
   function innerOf(panel) {
@@ -130,12 +86,7 @@
   function go(next) {
     if (reactAlive() || busy) return;
     var n = panelList().length;
-    if (next < 0) return;
-    /* Màn cuối + vuốt tiếp → hiện footer (không có React openFooter) */
-    if (next >= n) {
-      releaseFooter();
-      return;
-    }
+    if (next < 0 || next >= n) return;
     if (next === index) return;
     busy = true;
     apply(next);
@@ -209,12 +160,6 @@
     var useAxis = locked || (absX >= absY ? "h" : "v");
     if (useAxis !== "v") return;
     if (absY < SWIPE_MIN) return;
-
-    /* Footer đã hiện: vuốt bất kỳ hướng dọc → đóng */
-    if (isReleased()) {
-      closeFooterNative();
-      return;
-    }
 
     var inner = currentInner();
     var moved =

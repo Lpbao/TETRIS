@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { HomeProjectCurtainList } from "@/components/site/home-project-curtain-list";
 import { ProjectDetailRelated } from "@/components/site/project-detail-related";
 import { ProjectFilter } from "@/components/site/project-filter";
+import { ProjectPagination } from "@/components/site/project-pagination";
 import { Input } from "@/components/ui/input";
 import { useProjectShowcase } from "@/hooks/use-project-showcase";
 import type { SiteProject } from "@/lib/site-content";
@@ -39,6 +40,8 @@ export function ProjectShowcase({
     page,
     pageCount,
     setPage,
+    pageSize,
+    total,
     mode,
   } = useProjectShowcase({
     projects,
@@ -60,7 +63,7 @@ export function ProjectShowcase({
       data-home-section={isHome ? "projects" : undefined}
       className={cn(
         isHome
-          ? "flex min-h-[calc(100lvh-var(--site-header-total-height))] w-full flex-col justify-start px-3 py-8 md:px-4 md:py-12"
+          ? "flex min-h-[calc(100lvh-var(--site-header-total-height))] w-full flex-col justify-start"
           : "flex min-h-0 w-full flex-col justify-start",
         className,
       )}
@@ -68,7 +71,7 @@ export function ProjectShowcase({
       {tabsDisplay ? (
         <Suspense
           fallback={
-            <div className="h-[52px] shrink-0 border-b border-border/60 md:h-[60px]" />
+            <div className="h-[52px] shrink-0 md:h-[60px]" />
           }
         >
           <ProjectFilter stickTo="header" />
@@ -109,28 +112,14 @@ export function ProjectShowcase({
         )}
       </div>
 
-      {showPagination && pageCount > 1 ? (
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-center gap-4 px-4 pb-8">
-          <button
-            type="button"
-            className="text-xs uppercase tracking-[0.2em] text-foreground disabled:opacity-40"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-          >
-            Trước
-          </button>
-          <span className="text-xs text-muted-foreground">
-            {page} / {pageCount}
-          </span>
-          <button
-            type="button"
-            className="text-xs uppercase tracking-[0.2em] text-foreground disabled:opacity-40"
-            disabled={page >= pageCount}
-            onClick={() => setPage(page + 1)}
-          >
-            Sau
-          </button>
-        </div>
+      {showPagination && total > 0 ? (
+        <ProjectPagination
+          page={page}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+        />
       ) : null}
     </section>
   );

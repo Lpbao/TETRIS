@@ -26,7 +26,7 @@ Scripts: `npm run dev` (`prisma generate && next dev`), `lint`, `db:push`, `db:m
 
 1. **Server Components by default.** `"use client"` only for state, events, browser APIs, RHF, or hooks.
 2. **Two UIs, never mixed.** `components/site/` only under `(site)/`. `components/admin/` only under `admin/`. Share **only** `components/ui/`.
-3. **Public pages live in `src/app/(site)/`.** Do not copy `SiteHeader` / `SiteFooter` / `SiteJsonLd` into a page; `(site)/layout.tsx` already wraps them. Root `layout.tsx` is html/body/`Providers` only.
+3. **Public pages live in `src/app/(site)/`.** Do not copy `SiteHeader` / `SiteJsonLd` into a page; `(site)/layout.tsx` already wraps them. Root `layout.tsx` is html/body/`Providers` only.
 4. **No hardcoded header offsets.** Use `getHeaderOffset()` (`src/lib/home-scroll.ts`) or `var(--site-header-total-height)`. Do not sprinkle `64` / `80px`.
 5. **API routes:** `auth()` first → 401; Zod `safeParse` from `src/lib/validations/` → 400 + `flatten()`; Prisma via `@/lib/prisma` (never `new PrismaClient()`); JSON `{ error }` with 400/401/404/409/500. Exception: `/api/auth/[...nextauth]` re-exports `handlers` only. Media POST uses `formData()`, not JSON.
 6. **Landing copy:** Contact / `/projects` list still `src/lib/site-content.ts`. Home slider: `getHomeHeroSlides()`; Home grid: `getHomeProjects()`; `/projects/[slug]`: `getSiteProjectBySlug()` (`Post` published); About: `getSiteAbout()`; `/services`: `getSiteServices()`. Admin must not write `Post.content` / `Post.excerpt`.

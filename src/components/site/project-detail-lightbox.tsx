@@ -47,6 +47,16 @@ export function ProjectDetailLightbox({
   const goPrev = useCallback(() => goTo(current - 1), [current, goTo]);
   const goNext = useCallback(() => goTo(current + 1), [current, goTo]);
 
+  const handleClose = useCallback(
+    (event: React.SyntheticEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      /* Defer unmount — nếu đóng ngay trong click, sự kiện lọt xuống nút menu header. */
+      window.setTimeout(onClose, 0);
+    },
+    [onClose],
+  );
+
   useEffect(() => {
     if (!open) return;
 
@@ -59,10 +69,12 @@ export function ProjectDetailLightbox({
     document.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.documentElement.setAttribute("data-lightbox-open", "");
 
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
+      document.documentElement.removeAttribute("data-lightbox-open");
     };
   }, [open, onClose, goPrev, goNext]);
 
@@ -77,6 +89,7 @@ export function ProjectDetailLightbox({
       role="dialog"
       aria-modal="true"
       aria-label={`Xem ảnh ${title}`}
+      onClick={(event) => event.stopPropagation()}
     >
       <div
         className="project-detail-lightbox__stage"
@@ -115,7 +128,10 @@ export function ProjectDetailLightbox({
         variant="ghost"
         size="icon"
         className="project-detail-lightbox__close"
-        onClick={onClose}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+        }}
+        onClick={handleClose}
         aria-label="Đóng"
       >
         <X className="h-6 w-6" />

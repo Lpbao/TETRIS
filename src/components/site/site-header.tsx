@@ -51,14 +51,14 @@ function SiteHeaderInner({ pathname }: { pathname: string }) {
         data-menu={menuActive ? "open" : "closed"}
         data-home-overlay={lightChrome ? "" : undefined}
         className={cn(
-          "site-header pointer-events-auto fixed top-0 w-full border-b motion-reduce:transition-none",
+          "site-header pointer-events-auto fixed top-0 w-full motion-reduce:transition-none",
           !lightChrome &&
-            "transition-[background-color,border-color,backdrop-filter] duration-300",
+            "transition-[background-color,backdrop-filter] duration-300",
           menuActive
-            ? "border-border/60 bg-background"
+            ? "bg-background"
             : solidHeader
-              ? "border-border/60 bg-background/95 backdrop-blur-sm"
-              : "border-transparent",
+              ? "bg-background/95 backdrop-blur-sm"
+              : null,
         )}
       >
         <div className="site-header-bar relative z-10">

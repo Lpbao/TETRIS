@@ -1,5 +1,6 @@
 import { AboutPageScroll } from "@/components/site/about-page-scroll";
 import { getSiteAbout } from "@/lib/get-site-about";
+import { getSiteContact } from "@/lib/get-site-contact";
 import { createPageMetadata } from "@/lib/site-metadata";
 
 export const metadata = createPageMetadata({
@@ -13,6 +14,9 @@ export const metadata = createPageMetadata({
 export const dynamic = "force-dynamic";
 
 export default async function AboutPage() {
-  const content = await getSiteAbout();
-  return <AboutPageScroll content={content} />;
+  const [content, contact] = await Promise.all([
+    getSiteAbout(),
+    getSiteContact(),
+  ]);
+  return <AboutPageScroll content={content} contact={contact} />;
 }

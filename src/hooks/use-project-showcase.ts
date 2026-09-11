@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SiteProject } from "@/lib/site-content";
 
-export const PROJECT_SHOWCASE_PAGE_SIZE = 12;
+/** Số dự án mỗi trang trên `/projects`. */
+export const PROJECT_SHOWCASE_PAGE_SIZE = 10;
 
 export interface UseProjectShowcaseOptions {
   projects: readonly SiteProject[];
@@ -30,27 +31,26 @@ export function useProjectShowcase({
     const needle = query.trim().toLowerCase();
     if (!needle) return [...projects];
     return projects.filter((project) => {
-      const hay = [
-        project.title,
-        project.location,
-        project.categoryLabel,
-      ]
+      const hay = [project.title, project.location, project.categoryLabel]
         .join(" ")
         .toLowerCase();
       return hay.includes(needle);
     });
   }, [projects, query, showSearch]);
 
+  const total = filtered.length;
+
   const pageCount = showPagination
-    ? Math.max(1, Math.ceil(filtered.length / pageSize))
+    ? Math.max(1, Math.ceil(total / pageSize))
     : 1;
+
+  const safePage = Math.min(page, pageCount);
 
   const visible = useMemo(() => {
     if (!showPagination) return filtered;
-    const safePage = Math.min(page, pageCount);
     const start = (safePage - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageCount, pageSize, showPagination]);
+  }, [filtered, safePage, pageSize, showPagination]);
 
   useEffect(() => {
     setPage(1);
@@ -60,9 +60,11 @@ export function useProjectShowcase({
     visible,
     query,
     setQuery,
-    page: Math.min(page, pageCount),
+    page: safePage,
     pageCount,
     setPage,
+    pageSize,
+    total,
     mode: scrollEffectMode ? ("scroll" as const) : ("grid" as const),
     tabsDisplay,
     showSearch,

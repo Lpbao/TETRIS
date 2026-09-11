@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ContentSection } from "@/components/site/content-section";
 import { PartnersRow } from "@/components/site/partners-row";
+import { SiteFooter } from "@/components/site/site-footer";
 import type { BrandBreakLogoPhase } from "@/hooks/use-brand-break-scroll";
+import type { ContactPageContent } from "@/lib/validations/site-page";
 import { cn } from "@/lib/utils";
 
 interface ContentPartnerSectionProps {
@@ -16,6 +18,7 @@ interface ContentPartnerSectionProps {
   lettersSectionId?: string;
   /** Brand-break logo phase — hiện text khi rest kể cả in-view chậm trên iOS */
   logoPhase?: BrandBreakLogoPhase;
+  contact?: ContactPageContent;
 }
 
 /** Clip theo inner scroller thôi — không clamp window.innerHeight (iOS URL bar sai). */
@@ -95,6 +98,7 @@ export function ContentPartnerSection({
   className,
   lettersSectionId = "about-brand-break",
   logoPhase,
+  contact,
 }: ContentPartnerSectionProps) {
   const { ref, visible } = useContentPartnerReveal(logoPhase);
 
@@ -107,7 +111,7 @@ export function ContentPartnerSection({
       data-content-partner-animate={visible ? "in" : "out"}
       className={cn("relative w-full bg-background", className)}
     >
-      <div className="mx-auto flex w-full max-w-4xl flex-col justify-start px-4 py-6 md:py-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col justify-start px-4 pt-6 pb-0 md:pt-8 md:pb-0">
         <ContentSection
           title={journeyTitle}
           paragraphs={journeyParagraphs}
@@ -120,12 +124,13 @@ export function ContentPartnerSection({
         <PartnersRow
           title={partnersTitle}
           partners={partners}
-          className="mt-6 w-full py-4 pb-6 md:py-6 md:pb-8"
+          className="mt-6 w-full py-4 pb-0 md:py-6 md:pb-0"
           headingEffect="ml2"
           logoEffect="text-focus-in"
           lettersSectionId={lettersSectionId}
           forceLettersPlay={visible}
         />
+        <SiteFooter className="mt-[78px]" contact={contact} />
       </div>
     </div>
   );

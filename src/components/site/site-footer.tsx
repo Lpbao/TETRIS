@@ -2,29 +2,32 @@ import Link from "next/link";
 import { Mail } from "lucide-react";
 import { FaBehance, FaFacebookF, FaPhone, FaTiktok } from "react-icons/fa6";
 import { RiInstagramLine } from "react-icons/ri";
-import { getSiteContact } from "@/lib/get-site-contact";
 import { siteBrand, siteSocial } from "@/lib/site-content";
+import { getSitePageFallback } from "@/lib/site-page-defaults";
+import type { ContactPageContent } from "@/lib/validations/site-page";
 import { cn } from "@/lib/utils";
 
 interface SiteFooterProps {
   className?: string;
+  /** CMS contact; thiếu → fallback `siteContact` */
+  contact?: ContactPageContent;
 }
 
 const iconClass = "h-4 w-4";
 
-export async function SiteFooter({ className }: SiteFooterProps) {
-  const contact = await getSiteContact();
+export function SiteFooter({ className, contact }: SiteFooterProps) {
+  const resolved = contact ?? getSitePageFallback("contact");
 
   const socialItems = [
     {
       key: "phone",
-      href: `tel:${contact.phone.replace(/\s/g, "")}`,
+      href: `tel:${resolved.phone.replace(/\s/g, "")}`,
       label: "Gọi điện",
       icon: <FaPhone className={iconClass} aria-hidden />,
     },
     {
       key: "email",
-      href: `mailto:${contact.email}`,
+      href: `mailto:${resolved.email}`,
       label: "Email",
       icon: <Mail className={iconClass} strokeWidth={1.5} aria-hidden />,
     },
@@ -60,14 +63,16 @@ export async function SiteFooter({ className }: SiteFooterProps) {
 
   return (
     <footer id="site-footer" className={cn("site-footer", className)}>
-      <div className="site-footer-bar mx-auto flex h-[var(--site-footer-height)] max-w-6xl flex-col items-center justify-center gap-1.5 px-4">
-        <div className="flex items-center justify-center gap-5">
+      <div className="site-footer-bar">
+        <div className="site-footer-social">
           {socialItems.map((item) => (
             <Link
               key={item.key}
               href={item.href}
               target={
-                item.key === "phone" || item.key === "email" ? undefined : "_blank"
+                item.key === "phone" || item.key === "email"
+                  ? undefined
+                  : "_blank"
               }
               rel={
                 item.key === "phone" || item.key === "email"
@@ -81,9 +86,7 @@ export async function SiteFooter({ className }: SiteFooterProps) {
             </Link>
           ))}
         </div>
-        <p className="text-xs tracking-wide text-muted-foreground">
-          {siteBrand.copyright}
-        </p>
+        <p className="site-footer-copyright">{siteBrand.copyright}</p>
       </div>
     </footer>
   );

@@ -21,7 +21,7 @@ function isCoarsePointer(): boolean {
 export function useViewportBelowHeader(): ViewportBelowHeader {
   const [viewport, setViewport] = useState<ViewportBelowHeader>({
     height: 0,
-    headerOffset: 64,
+    headerOffset: 91,
   });
 
   const sync = useCallback(() => {

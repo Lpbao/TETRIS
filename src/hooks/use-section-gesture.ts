@@ -8,11 +8,9 @@ import {
 import type { UseSectionPagerResult } from "@/hooks/use-section-pager";
 import {
   FPS_FIXED_GESTURE_MIN_PX,
-  FPS_INNER_SCROLL_EDGE_PX,
   FPS_WHEEL_NOTCH_MIN,
   PARTNERS_SCROLL_SELECTOR,
 } from "@/lib/full-page-scroll/constants";
-import { shouldReengageFromFooterScroll } from "@/lib/full-page-scroll/terminal-footer";
 import { SECTION_AXIS_LOCK_MIN } from "@/lib/home-scroll";
 import type { InnerScrollSnapshot } from "@/lib/full-page-scroll/types";
 
@@ -88,13 +86,11 @@ function shouldBlockOverscroll(innerEl: HTMLElement): boolean {
   return true;
 }
 
-/** Brand-break: footer chỉ sau logo rest. */
-function canOpenAboutBrandBreakFooter(): boolean {
-  const brand = document
-    .getElementById("about-brand-break")
-    ?.querySelector("[data-brand-break]");
-  if (!(brand instanceof HTMLElement)) return true;
-  return brand.getAttribute("data-brand-break-logo") === "rest";
+function preferNativeInnerScroll(): boolean {
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 767px)").matches
+  );
 }
 
 export function useSectionGesture({
@@ -108,7 +104,6 @@ export function useSectionGesture({
   const innerScrollStartTopRef = useRef<number | null>(null);
   const innerEdgeStartRef = useRef<InnerScrollSnapshot | null>(null);
   const innerTakeoverRef = useRef(false);
-  const reengagePendingRef = useRef(false);
 
   useLayoutEffect(() => {
     pagerRef.current = pager;
@@ -127,10 +122,6 @@ export function useSectionGesture({
     };
 
     const onTouchStart = (event: TouchEvent) => {
-      if (pagerRef.current.isTerminalReleased) {
-        resetTouch();
-        return;
-      }
       if (isSiteChromeTouch(event.target)) {
         resetTouch();
         return;
@@ -172,13 +163,12 @@ export function useSectionGesture({
 
       const innerEl = resolveInnerScroll(event.target, pagerRef.current);
       const startTop = innerScrollStartTopRef.current;
-      /* Mobile/coarse: để native inner scroll — takeover + morph-pin → giật/stuck. */
-      const preferNativeInnerScroll =
-        window.matchMedia("(pointer: coarse)").matches ||
-        window.matchMedia("(max-width: 767px)").matches;
+      /* Mobile/coarse: một máy = native inner scroll. Không takeover, không
+         preventDefault giữa chừng (cắt momentum → giật/kẹt morph-pin). */
+      const nativeOnly = preferNativeInnerScroll();
 
       if (
-        !preferNativeInnerScroll &&
+        !nativeOnly &&
         innerEl &&
         startTop !== null &&
         swipeAxisRef.current === "vertical" &&
@@ -211,6 +201,7 @@ export function useSectionGesture({
       }
 
       if (
+        !nativeOnly &&
         innerEl &&
         deltaY < 0 &&
         absY >= SECTION_AXIS_LOCK_MIN &&
@@ -247,24 +238,11 @@ export function useSectionGesture({
       resetTouch();
 
       const p = pagerRef.current;
-      /* Released / footer: giao handler riêng — tránh nuốt vuốt đóng footer. */
-      if (
-        p.isTerminalReleased ||
-        p.footerPhase === "open" ||
-        p.footerPhase === "opening" ||
-        p.footerPhase === "closing"
-      ) {
-        return;
-      }
       if (p.isTransitioning) return;
       if (axis !== "vertical") return;
       if (absY < FPS_FIXED_GESTURE_MIN_PX) return;
 
       const inner = p.syncInnerScrollFromDom(p.currentIndex);
-      const lastIndex = p.sections.length - 1;
-      const isLastTerminal =
-        p.currentIndex === lastIndex &&
-        p.sections[lastIndex]?.mode === "terminal";
       const innerMoved =
         innerEl &&
         innerScrollStartTop !== null &&
@@ -272,29 +250,14 @@ export function useSectionGesture({
           INNER_SCROLL_GESTURE_PX;
 
       /*
-       * Finger lên (deltaY < 0) = xuống nội dung / màn sau / footer.
+       * Finger lên (deltaY < 0) = xuống nội dung / màn sau.
        * Finger xuống (deltaY > 0) = lên nội dung / màn trước.
-       * Không return sớm ở last-terminal khi deltaY > 0 — trước đây nuốt goPrev
-       * (Services panel ngắn: isAtTop && isAtBottom → mọi vuốt dính nhánh đáy).
        */
       if (deltaY < 0) {
         if (innerMoved && !startedAtBottom && !inner.isAtBottom) {
           return;
         }
         if (!(startedAtBottom || inner.isAtBottom)) return;
-
-        if (isLastTerminal) {
-          const sectionId = p.sections[p.currentIndex]?.id;
-          if (
-            sectionId === "about-brand-break" &&
-            !canOpenAboutBrandBreakFooter()
-          ) {
-            return;
-          }
-          if (p.canGoNext()) p.goNext();
-          return;
-        }
-
         p.goNext();
         return;
       }
@@ -309,14 +272,6 @@ export function useSectionGesture({
 
     const onWheel = (event: WheelEvent) => {
       const p = pagerRef.current;
-      if (
-        p.isTerminalReleased ||
-        p.footerPhase === "open" ||
-        p.footerPhase === "opening" ||
-        p.footerPhase === "closing"
-      ) {
-        return;
-      }
       if (p.isTransitioning) return;
       if (Math.abs(event.deltaY) < FPS_WHEEL_NOTCH_MIN) return;
 
@@ -324,12 +279,7 @@ export function useSectionGesture({
       const innerScrollEl = resolveInnerScroll(event.target, p);
       const inner = p.syncInnerScrollFromDom(p.currentIndex);
 
-      if (
-        section &&
-        (section.mode === "scrollable" || section.mode === "terminal") &&
-        innerScrollEl &&
-        inner
-      ) {
+      if (section && section.mode === "scrollable" && innerScrollEl && inner) {
         if (event.deltaY > 0 && !inner.isAtBottom) {
           innerScrollEl.scrollTop += event.deltaY;
           p.syncInnerScrollFromDom(p.currentIndex);
@@ -343,20 +293,6 @@ export function useSectionGesture({
       }
 
       if (event.deltaY > 0) {
-        const lastIndex = p.sections.length - 1;
-        const isLastTerminal =
-          p.currentIndex === lastIndex &&
-          p.sections[lastIndex]?.mode === "terminal";
-        if (isLastTerminal && inner.isAtBottom) {
-          if (
-            section?.id === "about-brand-break" &&
-            !canOpenAboutBrandBreakFooter()
-          ) {
-            return;
-          }
-          if (p.canGoNext()) p.goNext();
-          return;
-        }
         p.goNext();
         return;
       }
@@ -390,186 +326,4 @@ export function useSectionGesture({
       target.removeEventListener("wheel", onWheel);
     };
   }, [targetRef]);
-
-  useEffect(() => {
-    if (!pager.isTerminalReleased) {
-      reengagePendingRef.current = false;
-      return;
-    }
-
-    let touchOrigin: TouchOrigin | null = null;
-    let swipeAxis: SwipeAxis = null;
-
-    const resetReleasedTouch = () => {
-      touchOrigin = null;
-      swipeAxis = null;
-    };
-
-    const onReleasedTouchStart = (event: TouchEvent) => {
-      const touch = event.touches[0];
-      if (!touch) return;
-
-      touchOrigin = { x: touch.clientX, y: touch.clientY };
-      swipeAxis = isPartnersHorizontalTouch(event.target) ? "horizontal" : null;
-    };
-
-    const onReleasedTouchMove = (event: TouchEvent) => {
-      const origin = touchOrigin;
-      const touch = event.touches[0];
-      if (!origin || !touch) return;
-
-      const deltaX = touch.clientX - origin.x;
-      const deltaY = touch.clientY - origin.y;
-      const absX = Math.abs(deltaX);
-      const absY = Math.abs(deltaY);
-
-      if (
-        !swipeAxis &&
-        (absX >= SECTION_AXIS_LOCK_MIN || absY >= SECTION_AXIS_LOCK_MIN)
-      ) {
-        swipeAxis = absX >= absY ? "horizontal" : "vertical";
-      }
-    };
-
-    const onReleasedTouchEnd = (event: TouchEvent) => {
-      const origin = touchOrigin;
-      const touch = event.changedTouches[0];
-      if (!origin || !touch) {
-        resetReleasedTouch();
-        return;
-      }
-
-      const deltaY = touch.clientY - origin.y;
-      const absY = Math.abs(deltaY);
-      const axis =
-        swipeAxis ??
-        (Math.abs(touch.clientX - origin.x) >= absY ? "horizontal" : "vertical");
-
-      resetReleasedTouch();
-
-      if (axis !== "vertical") return;
-      if (absY < FPS_FIXED_GESTURE_MIN_PX) return;
-
-      /* Footer hiện: vuốt lên (docs) hoặc vuốt xuống / scroll lên nội dung → ẩn */
-      if (pager.footerPhase === "open" || pager.footerPhase === "opening") {
-        if (pager.canGoPrev()) pager.goPrev();
-        return;
-      }
-
-      if (deltaY >= 0) return;
-      if (pager.canGoPrev()) pager.goPrev();
-    };
-
-    const onReleasedWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaY) < FPS_WHEEL_NOTCH_MIN) return;
-      if (pager.footerPhase === "open" || pager.footerPhase === "opening") {
-        if (pager.canGoPrev()) pager.goPrev();
-        return;
-      }
-      if (event.deltaY >= 0) return;
-      if (pager.canGoPrev()) pager.goPrev();
-    };
-
-    const onWindowScroll = () => {
-      if (!shouldReengageFromFooterScroll()) return;
-      if (reengagePendingRef.current) return;
-      reengagePendingRef.current = true;
-      const didReengage = pager.reengageFromFooter();
-      if (!didReengage) {
-        reengagePendingRef.current = false;
-      }
-    };
-
-    window.addEventListener("touchstart", onReleasedTouchStart, { passive: true });
-    window.addEventListener("touchmove", onReleasedTouchMove, { passive: true });
-    window.addEventListener("touchend", onReleasedTouchEnd, { passive: true });
-    window.addEventListener("touchcancel", resetReleasedTouch, { passive: true });
-    window.addEventListener("wheel", onReleasedWheel, { passive: true });
-    window.addEventListener("scroll", onWindowScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("touchstart", onReleasedTouchStart);
-      window.removeEventListener("touchmove", onReleasedTouchMove);
-      window.removeEventListener("touchend", onReleasedTouchEnd);
-      window.removeEventListener("touchcancel", resetReleasedTouch);
-      window.removeEventListener("wheel", onReleasedWheel);
-      window.removeEventListener("scroll", onWindowScroll);
-    };
-  }, [pager, pager.isTerminalReleased]);
-
-  useEffect(() => {
-    if (pager.footerPhase !== "open" && pager.footerPhase !== "opening") return;
-
-    const footer = document.getElementById("site-footer");
-    if (!footer) return;
-
-    let touchOrigin: TouchOrigin | null = null;
-    let swipeAxis: SwipeAxis = null;
-
-    const resetFooterTouch = () => {
-      touchOrigin = null;
-      swipeAxis = null;
-    };
-
-    const onFooterTouchStart = (event: TouchEvent) => {
-      const touch = event.touches[0];
-      if (!touch) return;
-      touchOrigin = { x: touch.clientX, y: touch.clientY };
-      swipeAxis = null;
-    };
-
-    const onFooterTouchMove = (event: TouchEvent) => {
-      const origin = touchOrigin;
-      const touch = event.touches[0];
-      if (!origin || !touch) return;
-      const absX = Math.abs(touch.clientX - origin.x);
-      const absY = Math.abs(touch.clientY - origin.y);
-      if (
-        !swipeAxis &&
-        (absX >= SECTION_AXIS_LOCK_MIN || absY >= SECTION_AXIS_LOCK_MIN)
-      ) {
-        swipeAxis = absX >= absY ? "horizontal" : "vertical";
-      }
-    };
-
-    const onFooterTouchEnd = (event: TouchEvent) => {
-      const origin = touchOrigin;
-      const touch = event.changedTouches[0];
-      if (!origin || !touch) {
-        resetFooterTouch();
-        return;
-      }
-
-      const deltaY = touch.clientY - origin.y;
-      const absY = Math.abs(deltaY);
-      const axis =
-        swipeAxis ??
-        (Math.abs(touch.clientX - origin.x) >= absY ? "horizontal" : "vertical");
-      resetFooterTouch();
-
-      if (axis !== "vertical") return;
-      if (absY < FPS_FIXED_GESTURE_MIN_PX) return;
-      /* Vuốt lên hoặc xuống trên footer → đóng */
-      if (pager.canGoPrev()) pager.goPrev();
-    };
-
-    const onFooterWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaY) < FPS_WHEEL_NOTCH_MIN) return;
-      if (pager.canGoPrev()) pager.goPrev();
-    };
-
-    footer.addEventListener("touchstart", onFooterTouchStart, { passive: true });
-    footer.addEventListener("touchmove", onFooterTouchMove, { passive: true });
-    footer.addEventListener("touchend", onFooterTouchEnd, { passive: true });
-    footer.addEventListener("touchcancel", resetFooterTouch, { passive: true });
-    footer.addEventListener("wheel", onFooterWheel, { passive: true });
-
-    return () => {
-      footer.removeEventListener("touchstart", onFooterTouchStart);
-      footer.removeEventListener("touchmove", onFooterTouchMove);
-      footer.removeEventListener("touchend", onFooterTouchEnd);
-      footer.removeEventListener("touchcancel", resetFooterTouch);
-      footer.removeEventListener("wheel", onFooterWheel);
-    };
-  }, [pager, pager.footerPhase]);
 }

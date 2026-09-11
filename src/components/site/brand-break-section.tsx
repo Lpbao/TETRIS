@@ -7,6 +7,7 @@ import {
   useBrandBreakLogoEnter,
   useBrandBreakScroll,
 } from "@/hooks/use-brand-break-scroll";
+import type { ContactPageContent } from "@/lib/validations/site-page";
 import { cn } from "@/lib/utils";
 
 interface BrandBreakSectionProps {
@@ -17,6 +18,7 @@ interface BrandBreakSectionProps {
   partnersTitle: string;
   partners: readonly { name: string; logo: string }[];
   className?: string;
+  contact?: ContactPageContent;
 }
 
 export function BrandBreakSection({
@@ -27,6 +29,7 @@ export function BrandBreakSection({
   partnersTitle,
   partners,
   className,
+  contact,
 }: BrandBreakSectionProps) {
   const rootRef = useBrandBreakScroll();
   const logoPhase = useBrandBreakLogoEnter(rootRef);
@@ -56,6 +59,7 @@ export function BrandBreakSection({
         partners={partners}
         lettersSectionId="about-brand-break"
         logoPhase={logoPhase}
+        contact={contact}
       />
     </div>
   );

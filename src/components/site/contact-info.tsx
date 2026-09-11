@@ -10,29 +10,26 @@ export function ContactInfo({ contact, className }: ContactInfoProps) {
   const phoneHref = contact.phone.replace(/\s/g, "");
 
   return (
-    <section className={cn("py-12 text-center md:py-16", className)}>
-      <div className="mx-auto max-w-md space-y-3 px-4 text-sm text-muted-foreground">
+    <section className={cn("contact-info", className)}>
+      <div className="contact-info-list">
         <p>
-          <span className="sr-only">Email: </span>
+          <span className="contact-info-label">Email: </span>
           <a
             href={`mailto:${contact.email}`}
-            className="transition-colors hover:text-brand-red"
+            className="contact-info-value"
           >
             {contact.email}
           </a>
         </p>
         <p>
-          <span className="text-foreground">Số điện thoại: </span>
-          <a
-            href={`tel:${phoneHref}`}
-            className="transition-colors hover:text-brand-red"
-          >
+          <span className="contact-info-label">Số điện thoại: </span>
+          <a href={`tel:${phoneHref}`} className="contact-info-value">
             {contact.phone}
           </a>
         </p>
         <p>
-          <span className="text-foreground">Địa chỉ: </span>
-          {contact.address}
+          <span className="contact-info-label">Địa chỉ: </span>
+          <span className="contact-info-value">{contact.address}</span>
         </p>
       </div>
     </section>

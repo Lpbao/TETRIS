@@ -1,25 +1,19 @@
 import type { CSSProperties, Ref } from "react";
 import {
   TETRIS_LOGO_BLOCKS,
-  TETRIS_LOGO_H_RATIO,
-  TETRIS_LOGO_H_RATIO_SUM,
   TETRIS_LOGO_VIEW_H,
   TETRIS_LOGO_VIEW_W,
 } from "@/lib/tetris-logo-mark";
 
 interface SiteLoadingScreenProps {
   rootRef?: Ref<HTMLDivElement>;
-  /** Tự ẩn sau hold + shrink + flicker — intro/overlay, không dùng cho loading.tsx */
+  /** Tự ẩn sau `--sl-autodismiss-ms` — intro/overlay, không dùng cho chờ RSC lâu */
   autoDismiss?: boolean;
 }
 
 const loadingVars = {
   "--sl-sum-w": TETRIS_LOGO_VIEW_W,
   "--sl-sum-h": TETRIS_LOGO_VIEW_H,
-  "--sl-cover-r-top": TETRIS_LOGO_H_RATIO.top,
-  "--sl-cover-r-mid": TETRIS_LOGO_H_RATIO.mid,
-  "--sl-cover-r-bot": TETRIS_LOGO_H_RATIO.bot,
-  "--sl-cover-r-sum": TETRIS_LOGO_H_RATIO_SUM,
   "--sl-h-top": TETRIS_LOGO_BLOCKS.top.h,
   "--sl-h-mid": TETRIS_LOGO_BLOCKS.mid.h,
   "--sl-h-bot": TETRIS_LOGO_BLOCKS.bot.h,

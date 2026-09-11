@@ -25,7 +25,7 @@ export default async function AboutPage() {
 
 - Public: `src/app/(site)/{route}/page.tsx`. Admin: `src/app/admin/.../page.tsx`. Default export Server Component.
 - Metadata via `createPageMetadata`. Dynamic routes: `params` / `searchParams` are **Promises** — `const { slug } = await params`. Missing slug/id → `notFound()`.
-- Do not add a second header/footer on public pages. `(site)/layout.tsx` already renders `SiteJsonLd`, `SiteHeader`, `<main>`, `SiteFooter`.
+- Do not add a second header on public pages. `(site)/layout.tsx` already renders `SiteJsonLd`, `SiteHeader`, `<main>`.
 - Fetch in the page (Prisma, `site-content`, or `getHomeHeroSlides` / `getHomeProjects` / `getSiteProjects` / `getSiteAbout` / `getSiteServices` / `getSiteProjectBySlug`); pass props into `components/site/` or `components/admin/`.
 - `/`, `/about`, `/projects`, `/services`: full-screen sections. Home: `HeroCarousel` + `ProjectGrid` + `HomeSectionPaging` and `dynamic = "force-dynamic"`. About/Projects/Services: `*PageScroll` + `{page}-section-config.ts`. About and Services also `dynamic = "force-dynamic"` (CMS). `/projects/[slug]` đọc `Post` (`getSiteProjectBySlug`, `force-dynamic`). Static `site-content` detail pages may use `generateStaticParams`.
 - Admin pages: `AdminPageHeader` + `Card`; Prisma in try/catch that sets a Vietnamese `dbError` and `posts = []` (see `admin/posts/page.tsx`). Optional `auth()` then `return null` if no session. Layout already wraps `MediaDrawerProvider`.

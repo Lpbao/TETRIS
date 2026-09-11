@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ReactNode, MouseEvent } from "react";
 import { useSiteLoading } from "@/components/site/site-loading-context";
 
 interface ProjectCardLinkProps {
@@ -15,16 +15,16 @@ export function ProjectCardLink({
   children,
   triggerLoading = false,
 }: ProjectCardLinkProps) {
-  const { show } = useSiteLoading();
+  const { navigateWithLoading } = useSiteLoading();
+
+  const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!triggerLoading) return;
+    event.preventDefault();
+    navigateWithLoading(href);
+  };
 
   return (
-    <Link
-      href={href}
-      className="flex flex-col items-center"
-      onClick={() => {
-        if (triggerLoading) show();
-      }}
-    >
+    <Link href={href} className="flex flex-col items-center" onClick={onClick}>
       {children}
     </Link>
   );

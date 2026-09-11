@@ -15,15 +15,22 @@ function cssTimeToMs(value: string) {
 
 interface SiteLoadingRunProps {
   onDone: () => void;
+  /** Intro / `show()` — tự ẩn theo token. Route nav: `false` (chờ data). */
+  dismissOnTimer?: boolean;
 }
 
-export function SiteLoadingRun({ onDone }: SiteLoadingRunProps) {
+export function SiteLoadingRun({
+  onDone,
+  dismissOnTimer = true,
+}: SiteLoadingRunProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => subscribeSiteViewportHeight(), []);
 
   useEffect(() => {
+    if (!dismissOnTimer) return;
+
     if (reducedMotion) {
       onDone();
       return;
@@ -31,17 +38,21 @@ export function SiteLoadingRun({ onDone }: SiteLoadingRunProps) {
 
     const root = rootRef.current;
     const styles = root ? getComputedStyle(root) : null;
-    const holdMs = cssTimeToMs(styles?.getPropertyValue("--sl-hold-ms") ?? "1s");
-    const shrinkMs = cssTimeToMs(styles?.getPropertyValue("--sl-shrink-ms") ?? "1.1s");
-    const flickerMs = cssTimeToMs(styles?.getPropertyValue("--sl-flicker-ms") ?? "0.84s");
-    const total = holdMs + shrinkMs + flickerMs;
+    const dismissMs = cssTimeToMs(
+      styles?.getPropertyValue("--sl-autodismiss-ms") ?? "0.6s",
+    );
     const id = window.setTimeout(
       onDone,
-      Number.isFinite(total) && total > 0 ? total : 2940,
+      Number.isFinite(dismissMs) && dismissMs > 0 ? dismissMs : 600,
     );
 
     return () => window.clearTimeout(id);
-  }, [onDone, reducedMotion]);
+  }, [onDone, reducedMotion, dismissOnTimer]);
 
-  return <SiteLoadingScreen rootRef={rootRef} autoDismiss />;
+  return (
+    <SiteLoadingScreen
+      rootRef={rootRef}
+      autoDismiss={dismissOnTimer && !reducedMotion}
+    />
+  );
 }

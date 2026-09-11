@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SiteFooter } from "@/components/site/site-footer";
 import { SiteImage } from "@/components/site/site-image";
 import { useSectionEnterOnce } from "@/hooks/use-section-enter-once";
+import type { ContactPageContent } from "@/lib/validations/site-page";
 import { cn } from "@/lib/utils";
 
 interface ServiceSectionProps {
@@ -13,10 +15,11 @@ interface ServiceSectionProps {
   reverse?: boolean;
   /** Full viewport panel inside virtual pager (Services page) */
   fullPage?: boolean;
-  /** Màn cuối + footer auto-height (fullPage fp-auto-height) */
-  terminal?: boolean;
   sectionId: string;
   className?: string;
+  /** Màn cuối — footer dưới block + min-height copy */
+  showFooter?: boolean;
+  contact?: ContactPageContent;
 }
 
 /** Không để opacity:0 mãi nếu enter-once / animation kẹt (hay gặp trên phone). */
@@ -38,9 +41,10 @@ export function ServiceSection({
   imageAlt,
   reverse = false,
   fullPage = false,
-  terminal = false,
   sectionId,
   className,
+  showFooter = false,
+  contact,
 }: ServiceSectionProps) {
   const entered = useSectionEnterOnce(sectionId);
   const [play, setPlay] = useState(false);
@@ -73,6 +77,7 @@ export function ServiceSection({
 
   return (
     <section
+      data-services-last={showFooter ? "" : undefined}
       className={cn(
         fullPage
           ? "flex min-h-full w-full flex-col justify-start bg-background"
@@ -82,18 +87,19 @@ export function ServiceSection({
     >
       <div
         data-focus-in-expand={play ? "in" : "out"}
+        data-services-last-main={showFooter ? "" : undefined}
         className={cn(
-          "mx-auto w-full max-w-6xl px-4",
+          "mx-auto w-full max-w-6xl px-[28px]",
           fullPage
-            ? cn(
-                "flex flex-1 flex-col justify-start gap-[32px] pt-[38px] md:grid md:grid-cols-2 md:gap-12",
-                terminal ? "md:items-start" : "md:items-center",
-              )
+            ? "flex flex-1 flex-col justify-start gap-[32px] pt-[38px] md:grid md:grid-cols-2 md:items-center md:gap-12"
             : "grid items-center gap-8 md:grid-cols-2 md:gap-12",
           reverse && "md:[&>*:first-child]:order-2",
         )}
       >
-        <div className="relative aspect-[4/3] w-full overflow-hidden">
+        <div
+          data-service-media=""
+          className="relative aspect-[4/3] w-full overflow-hidden"
+        >
           <SiteImage
             src={image}
             alt={imageAlt}
@@ -105,18 +111,25 @@ export function ServiceSection({
           />
         </div>
 
-        <div>
+        <div data-service-copy="">
           <h2
             data-service-title=""
-            className="text-sm font-bold uppercase md:text-base"
+            className="text-[18px] font-normal uppercase"
           >
             {title}
           </h2>
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:mt-6">
+          <p className="mt-[8px] text-sm leading-relaxed text-muted-foreground">
             {description}
           </p>
         </div>
       </div>
+
+      {showFooter ? (
+        <SiteFooter
+          className="mt-[var(--services-footer-gap)]"
+          contact={contact}
+        />
+      ) : null}
     </section>
   );
 }

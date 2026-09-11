@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSiteLoading } from "@/components/site/site-loading-context";
 import { siteNav } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ export function SiteNavLinks({
   menuPhase,
 }: SiteNavLinksProps) {
   const pathname = usePathname();
+  const { navigateWithLoading } = useSiteLoading();
 
   return (
     <nav
@@ -48,8 +50,15 @@ export function SiteNavLinks({
               <Link
                 href={item.href}
                 prefetch={!isActive}
-                onClick={onNavigate}
-                aria-current={menuPhase !== undefined && isActive ? "page" : undefined}
+                onClick={(event) => {
+                  onNavigate?.();
+                  if (isActive) return;
+                  event.preventDefault();
+                  navigateWithLoading(item.href);
+                }}
+                aria-current={
+                  menuPhase !== undefined && isActive ? "page" : undefined
+                }
                 className={cn(
                   menuPhase === undefined &&
                     "text-sm font-medium uppercase tracking-[0.2em] transition-colors",

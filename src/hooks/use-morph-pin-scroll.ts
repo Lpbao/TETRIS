@@ -93,7 +93,7 @@ function measurePhotoClipPercent(root: HTMLElement): number {
   return Math.min(100, (clipPx / pinRect.height) * 100);
 }
 
-/** Giữ phase morph khi inner viewport đổi (đóng/mở footer). Extra sau unstick giữ px. */
+/** Giữ phase morph khi inner viewport đổi. Extra sau unstick giữ px. */
 function remapScrollTopForVvhChange(
   scroller: HTMLElement,
   prevVvh: number,
@@ -154,6 +154,13 @@ export function useMorphPinScroll(sectionId: string) {
   const frozenTopRef = useRef<number | null>(null);
   const frozenShrinkRef = useRef<number | null>(null);
   const frozenShiftRef = useRef<number | null>(null);
+  /**
+   * Target shift (ảnh đáy + title-gap − title natural).
+   * Cập nhật khi ảnh còn scale; đóng băng sau shrinkDone (pin) rồi khi flow.
+   * Không khóa one-shot lúc mới vào image — đáy ảnh còn thấp → chữ bị đè.
+   */
+  const targetShiftRef = useRef<number | null>(null);
+  const lastMeasureProgressRef = useRef({ pShrink: -1, pAlign: -1 });
   const lastVvhRef = useRef(0);
   const shiftRef = useRef(0);
   const { pager, getPanelMotionState } = useFullPageScroll();
@@ -170,6 +177,7 @@ export function useMorphPinScroll(sectionId: string) {
     root.dataset.morphPinBound = "react";
 
     let frame = 0;
+    let touchEndFrame = 0;
     /* Đang chạm: không được set `scrollTop` (remap) — iOS sẽ hủy momentum và
        ảnh giật thay vì scale. Chờ nhấc tay rồi mới remap. */
     let touching = false;
@@ -227,6 +235,8 @@ export function useMorphPinScroll(sectionId: string) {
           alignSpeed,
         );
         frozenShiftRef.current = null;
+        targetShiftRef.current = null;
+        lastMeasureProgressRef.current = { pShrink: -1, pAlign: -1 };
       }
       lastVvhRef.current = vvh;
 
@@ -266,6 +276,11 @@ export function useMorphPinScroll(sectionId: string) {
         frozenShiftRef.current = null;
       }
 
+      if (!lettersOut) {
+        targetShiftRef.current = null;
+        lastMeasureProgressRef.current = { pShrink: -1, pAlign: -1 };
+      }
+
       let phase = "letter";
       if (titleArrived) phase = "flow";
       else if (shrinkDone) phase = "pin";
@@ -293,24 +308,50 @@ export function useMorphPinScroll(sectionId: string) {
 
       let contentShift = 0;
       if (lettersOut) {
-        /* Đang chạm: đừng đo lại shift (getBoundingClientRect nhiễu → chữ/ảnh giật). */
+        /* Đang chạm: giữ shift hiện tại — không đo (rect nhiễu). */
         if (touching) {
           contentShift = shiftRef.current;
+        } else if (titleArrived) {
+          if (frozenShiftRef.current === null) {
+            const measured = measureContentShiftPx(
+              root,
+              titleGapPx,
+              shiftRef.current,
+            );
+            frozenShiftRef.current =
+              measured ?? targetShiftRef.current ?? shiftRef.current;
+            if (measured !== null) targetShiftRef.current = measured;
+          }
+          contentShift = frozenShiftRef.current;
         } else {
-          const targetShift = measureContentShiftPx(
-            root,
-            titleGapPx,
-            shiftRef.current,
-          );
-          if (targetShift !== null) {
-            if (titleArrived) {
-              if (frozenShiftRef.current === null) {
-                frozenShiftRef.current = targetShift;
-              }
-              contentShift = frozenShiftRef.current;
-            } else {
-              contentShift = pAlign * targetShift;
+          /*
+           * Image phase: đo lại khi p-shrink/p-align đổi (đáy ảnh lên khi scale).
+           * Pin (shrinkDone): geometry ổn → đo một lần rồi tái dùng.
+           */
+          const last = lastMeasureProgressRef.current;
+          const progressMoved =
+            Math.abs(pShrink - last.pShrink) > 0.001 ||
+            Math.abs(pAlign - last.pAlign) > 0.001;
+          const needMeasure =
+            targetShiftRef.current === null ||
+            (!shrinkDone && progressMoved) ||
+            (shrinkDone && last.pShrink < 1 && progressMoved);
+
+          if (needMeasure) {
+            const measured = measureContentShiftPx(
+              root,
+              titleGapPx,
+              shiftRef.current,
+            );
+            if (measured !== null) {
+              targetShiftRef.current = measured;
+              lastMeasureProgressRef.current = { pShrink, pAlign };
             }
+          }
+
+          const targetShift = targetShiftRef.current;
+          if (targetShift !== null) {
+            contentShift = pAlign * targetShift;
           }
         }
       }
@@ -341,7 +382,12 @@ export function useMorphPinScroll(sectionId: string) {
 
     const onTouchEnd = () => {
       touching = false;
-      sync();
+      /* Chờ browser settle — tránh đo ngay lúc nhấc tay (iOS). */
+      if (touchEndFrame) cancelAnimationFrame(touchEndFrame);
+      touchEndFrame = requestAnimationFrame(() => {
+        touchEndFrame = 0;
+        sync();
+      });
     };
 
     const img = root.querySelector("[data-morph-pin-image] img");
@@ -369,6 +415,7 @@ export function useMorphPinScroll(sectionId: string) {
       img?.removeEventListener("load", onImageLoad);
       observer.disconnect();
       if (frame) cancelAnimationFrame(frame);
+      if (touchEndFrame) cancelAnimationFrame(touchEndFrame);
     };
   }, [enabled]);
 

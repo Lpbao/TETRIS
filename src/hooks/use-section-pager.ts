@@ -12,14 +12,7 @@ import {
   FPS_TRANSITION_COOLDOWN_PAD_MS,
   FPS_TRANSITION_MS,
 } from "@/lib/full-page-scroll/constants";
-import {
-  afterLayoutFrames,
-  resetWindowScrollForPager,
-  scrollToSiteFooter,
-  shouldReengageFromFooterScroll,
-} from "@/lib/full-page-scroll/terminal-footer";
 import type {
-  FpsFooterPhase,
   FpsTransitionEffect,
   InnerScrollSnapshot,
   SectionDef,
@@ -31,8 +24,6 @@ const DEFAULT_INNER: InnerScrollSnapshot = {
   isAtBottom: true,
 };
 
-const PAGE_TOP_TOLERANCE_PX = 8;
-
 export interface SectionPagerTransition {
   from: number;
   to: number;
@@ -43,9 +34,6 @@ export interface UseSectionPagerResult {
   currentIndex: number;
   transition: SectionPagerTransition | null;
   isTransitioning: boolean;
-  isTerminalReleased: boolean;
-  footerPhase: FpsFooterPhase;
-  isFooterOpen: boolean;
   transitionMs: number;
   getInnerScroll(index: number): InnerScrollSnapshot;
   setInnerScroll(index: number, snapshot: InnerScrollSnapshot): void;
@@ -53,9 +41,6 @@ export interface UseSectionPagerResult {
   goTo(index: number): boolean;
   goNext(): boolean;
   goPrev(): boolean;
-  releaseTerminal(): void;
-  reengageFromFooter(): boolean;
-  reengageTerminal(): void;
   canGoNext(): boolean;
   canGoPrev(): boolean;
 }
@@ -78,21 +63,15 @@ export function useSectionPager(
   const [transition, setTransition] = useState<SectionPagerTransition | null>(
     null,
   );
-  const [isTerminalReleased, setIsTerminalReleased] = useState(false);
-  const [footerPhase, setFooterPhase] = useState<FpsFooterPhase>("closed");
   const innerScrollMapRef = useRef<Map<number, InnerScrollSnapshot>>(new Map());
   const cooldownRef = useRef(false);
   const cooldownTimerRef = useRef<number | undefined>(undefined);
-  const footerTimerRef = useRef<number | undefined>(undefined);
 
   const lastIndex = sections.length - 1;
   const durationMs =
     effect === "slide" ? FPS_SLIDE_TRANSITION_MS : FPS_TRANSITION_MS;
   const transitionMs = reducedMotion ? 0 : durationMs;
-  const isFooterAnimating =
-    footerPhase === "opening" || footerPhase === "closing";
-  const isFooterOpen = footerPhase === "open" || footerPhase === "opening";
-  const isTransitioning = transition !== null || isFooterAnimating;
+  const isTransitioning = transition !== null;
 
   const getInnerScroll = useCallback((index: number) => {
     return innerScrollMapRef.current.get(index) ?? DEFAULT_INNER;
@@ -119,25 +98,6 @@ export function useSectionPager(
     [getInnerScroll, sections, setInnerScroll],
   );
 
-  const isTerminalSectionIndex = useCallback(
-    (index: number) => sections[index]?.mode === "terminal",
-    [sections],
-  );
-
-  const applyLayoutForIndex = useCallback(
-    (index: number) => {
-      if (isTerminalSectionIndex(index)) {
-        setIsTerminalReleased(true);
-        afterLayoutFrames(() => {
-          resetWindowScrollForPager();
-        });
-      } else {
-        setIsTerminalReleased(false);
-      }
-    },
-    [isTerminalSectionIndex],
-  );
-
   const beginCooldown = useCallback(() => {
     cooldownRef.current = true;
     window.clearTimeout(cooldownTimerRef.current);
@@ -146,43 +106,18 @@ export function useSectionPager(
     }, transitionMs > 0 ? transitionMs + FPS_TRANSITION_COOLDOWN_PAD_MS : 0);
   }, [transitionMs]);
 
-  const isAtTerminalPageTop = useCallback(
-    (index: number) => {
-      const inner = syncInnerScrollFromDom(index);
-      return (
-        window.scrollY <= PAGE_TOP_TOLERANCE_PX && inner.isAtTop
-      );
-    },
-    [syncInnerScrollFromDom],
-  );
-
   const canGoNext = useCallback(() => {
     if (isTransitioning || cooldownRef.current) return false;
-    if (footerPhase === "open") return false;
 
     const section = sections[currentIndex];
     if (!section) return false;
 
-    if (isTerminalReleased && currentIndex === lastIndex) {
-      const inner = syncInnerScrollFromDom(currentIndex);
-      return inner.isAtBottom;
-    }
-
-    if (isTerminalReleased) return false;
-
     if (section.mode === "fixed") return currentIndex < lastIndex;
 
     const inner = syncInnerScrollFromDom(currentIndex);
-    // Trang 1 màn terminal (vd. /projects): inner bottom → được release footer
-    // About slide: inner bottom → slide footer như một màn
-    if (section.mode === "terminal" && currentIndex === lastIndex) {
-      return inner.isAtBottom;
-    }
     return inner.isAtBottom && currentIndex < lastIndex;
   }, [
     currentIndex,
-    footerPhase,
-    isTerminalReleased,
     isTransitioning,
     lastIndex,
     sections,
@@ -190,21 +125,7 @@ export function useSectionPager(
   ]);
 
   const canGoPrev = useCallback(() => {
-    /* Footer đang hiện: luôn cho đóng — check trước isTransitioning
-       (opening cũng làm isTransitioning=true, nếu đảo thứ tự thì nhánh này dead). */
-    if (footerPhase === "open" || footerPhase === "opening") return true;
-
-    if (isTransitioning) return false;
-
-    if (cooldownRef.current) return false;
-
-    if (isTerminalReleased && currentIndex === lastIndex) {
-      if (isAtTerminalPageTop(currentIndex) && currentIndex > 0) {
-        return true;
-      }
-      return shouldReengageFromFooterScroll();
-    }
-
+    if (isTransitioning || cooldownRef.current) return false;
     if (currentIndex === 0) return false;
 
     const section = sections[currentIndex];
@@ -216,11 +137,7 @@ export function useSectionPager(
     return inner.isAtTop;
   }, [
     currentIndex,
-    footerPhase,
-    isAtTerminalPageTop,
-    isTerminalReleased,
     isTransitioning,
-    lastIndex,
     sections,
     syncInnerScrollFromDom,
   ]);
@@ -232,24 +149,11 @@ export function useSectionPager(
       const clamped = Math.max(0, Math.min(index, lastIndex));
       if (clamped === currentIndex) return false;
 
-      if (isTerminalReleased && clamped > currentIndex) return false;
-
       beginCooldown();
-      if (effect === "slide") {
-        setIsTerminalReleased(false);
-        setFooterPhase("closed");
-      } else {
-        applyLayoutForIndex(clamped);
-      }
 
       const finish = (nextIndex: number) => {
         setCurrentIndex(nextIndex);
         setTransition(null);
-        if (effect === "slide") {
-          setIsTerminalReleased(false);
-          return;
-        }
-        applyLayoutForIndex(nextIndex);
       };
 
       if (transitionMs === 0) {
@@ -263,168 +167,23 @@ export function useSectionPager(
       return true;
     },
     [
-      applyLayoutForIndex,
       beginCooldown,
       currentIndex,
-      effect,
-      isTerminalReleased,
       isTransitioning,
       lastIndex,
       transitionMs,
     ],
   );
 
-  const openFooter = useCallback((): boolean => {
-    if (isTransitioning || cooldownRef.current) return false;
-    if (footerPhase !== "closed") return false;
-
-    beginCooldown();
-    setIsTerminalReleased(true);
-    if (transitionMs === 0) {
-      setFooterPhase("open");
-      afterLayoutFrames(() => {
-        resetWindowScrollForPager();
-      });
-      return true;
-    }
-
-    setFooterPhase("opening");
-    afterLayoutFrames(() => {
-      resetWindowScrollForPager();
-    });
-    window.clearTimeout(footerTimerRef.current);
-    footerTimerRef.current = window.setTimeout(() => {
-      setFooterPhase("open");
-    }, transitionMs);
-    return true;
-  }, [beginCooldown, footerPhase, isTransitioning, transitionMs]);
-
-  const closeFooter = useCallback((): boolean => {
-    if (footerPhase !== "open" && footerPhase !== "opening") return false;
-    /* Chỉ chặn khi đang slide section — không chặn lúc footer opening. */
-    if (transition !== null) return false;
-
-    beginCooldown();
-    if (transitionMs === 0) {
-      setFooterPhase("closed");
-      setIsTerminalReleased(false);
-      afterLayoutFrames(() => {
-        resetWindowScrollForPager();
-      });
-      return true;
-    }
-
-    setFooterPhase("closing");
-    window.clearTimeout(footerTimerRef.current);
-    footerTimerRef.current = window.setTimeout(() => {
-      setFooterPhase("closed");
-      setIsTerminalReleased(false);
-      afterLayoutFrames(() => {
-        resetWindowScrollForPager();
-      });
-    }, transitionMs);
-    return true;
-  }, [beginCooldown, footerPhase, transition, transitionMs]);
-
   const goNext = useCallback((): boolean => {
-    if (isTransitioning || cooldownRef.current) return false;
-
-    const section = sections[currentIndex];
-    if (!section) return false;
-
-    if (effect === "slide" && currentIndex === lastIndex) {
-      if (!canGoNext()) return false;
-      return openFooter();
-    }
-
-    if (isTerminalReleased && currentIndex === lastIndex) {
-      if (!canGoNext()) return false;
-      beginCooldown();
-      afterLayoutFrames(() => {
-        scrollToSiteFooter(reducedMotion);
-      });
-      return true;
-    }
-
     if (!canGoNext()) return false;
-
-    if (section.mode === "terminal" && currentIndex === lastIndex) {
-      beginCooldown();
-      applyLayoutForIndex(currentIndex);
-      return true;
-    }
-
     return goTo(currentIndex + 1);
-  }, [
-    applyLayoutForIndex,
-    beginCooldown,
-    canGoNext,
-    currentIndex,
-    effect,
-    goTo,
-    isTerminalReleased,
-    isTransitioning,
-    lastIndex,
-    openFooter,
-    reducedMotion,
-    sections,
-  ]);
-
-  const reengageFromFooter = useCallback((): boolean => {
-    if (isTransitioning || cooldownRef.current || !isTerminalReleased) {
-      return false;
-    }
-
-    beginCooldown();
-    afterLayoutFrames(() => {
-      resetWindowScrollForPager();
-    });
-    return true;
-  }, [beginCooldown, isTerminalReleased, isTransitioning]);
+  }, [canGoNext, currentIndex, goTo]);
 
   const goPrev = useCallback((): boolean => {
-    if (footerPhase === "open" || footerPhase === "opening") {
-      return closeFooter();
-    }
-
-    if (isTransitioning) return false;
-
-    if (cooldownRef.current) return false;
-
-    if (isTerminalReleased && currentIndex === lastIndex) {
-      if (isAtTerminalPageTop(currentIndex) && currentIndex > 0) {
-        return goTo(currentIndex - 1);
-      }
-
-      if (shouldReengageFromFooterScroll()) {
-        return reengageFromFooter();
-      }
-
-      return false;
-    }
-
     if (!canGoPrev()) return false;
     return goTo(currentIndex - 1);
-  }, [
-    canGoPrev,
-    closeFooter,
-    currentIndex,
-    footerPhase,
-    goTo,
-    isAtTerminalPageTop,
-    isTerminalReleased,
-    isTransitioning,
-    lastIndex,
-    reengageFromFooter,
-  ]);
-
-  const releaseTerminal = useCallback(() => {
-    setIsTerminalReleased(true);
-  }, []);
-
-  const reengageTerminal = useCallback(() => {
-    setIsTerminalReleased(false);
-  }, []);
+  }, [canGoPrev, currentIndex, goTo]);
 
   return useMemo(
     () => ({
@@ -432,9 +191,6 @@ export function useSectionPager(
       currentIndex,
       transition,
       isTransitioning,
-      isTerminalReleased,
-      footerPhase,
-      isFooterOpen,
       transitionMs,
       getInnerScroll,
       setInnerScroll,
@@ -442,9 +198,6 @@ export function useSectionPager(
       goTo,
       goNext,
       goPrev,
-      releaseTerminal,
-      reengageFromFooter,
-      reengageTerminal,
       canGoNext,
       canGoPrev,
     }),
@@ -456,13 +209,7 @@ export function useSectionPager(
       goNext,
       goPrev,
       goTo,
-      isFooterOpen,
-      isTerminalReleased,
       isTransitioning,
-      footerPhase,
-      reengageFromFooter,
-      reengageTerminal,
-      releaseTerminal,
       sections,
       setInnerScroll,
       syncInnerScrollFromDom,

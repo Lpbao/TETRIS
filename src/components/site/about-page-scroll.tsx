@@ -10,13 +10,17 @@ import {
   type FullPageScrollSection,
 } from "@/components/site/full-page-scroll";
 import { ABOUT_SECTIONS } from "@/lib/about-section-config";
-import type { AboutPageContent } from "@/lib/validations/site-page";
+import type {
+  AboutPageContent,
+  ContactPageContent,
+} from "@/lib/validations/site-page";
 
 interface AboutPageScrollProps {
   content: AboutPageContent;
+  contact?: ContactPageContent;
 }
 
-export function AboutPageScroll({ content }: AboutPageScrollProps) {
+export function AboutPageScroll({ content, contact }: AboutPageScrollProps) {
   const panels: FullPageScrollSection[] = [
     {
       def: ABOUT_SECTIONS[0]!,
@@ -53,6 +57,7 @@ export function AboutPageScroll({ content }: AboutPageScrollProps) {
           journeyParagraphs={content.journey.paragraphs}
           partnersTitle={content.partners.title}
           partners={content.partners.items}
+          contact={contact}
         />
       ),
     },

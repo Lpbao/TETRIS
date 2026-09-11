@@ -42,6 +42,7 @@ export function FullPageScrollRoot({
   const [jsReady, setJsReady] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line
     setJsReady(true);
     const win = window as unknown as { __siteFpsReact?: boolean };
     win.__siteFpsReact = true;
@@ -90,19 +91,13 @@ export function FullPageScrollRoot({
     <FullPageScrollProvider value={contextValue}>
       <div
         data-full-page-scroll=""
-        data-full-page-scroll-active={!pager.isTerminalReleased ? "" : undefined}
-        data-fps-released={pager.isTerminalReleased ? "" : undefined}
+        data-full-page-scroll-active=""
         data-fps-effect={effect}
-        data-fps-footer={effect === "slide" ? pager.footerPhase : undefined}
         data-fps-slide-ready={effect === "slide" && slideReady ? "" : undefined}
         data-fps-js={jsReady ? "" : undefined}
-        className={cn(
-          "relative w-full",
-          pager.isTerminalReleased && "flex min-h-0 flex-1 flex-col",
-          className,
-        )}
+        className={cn("relative w-full", className)}
         style={{
-          height: pager.isTerminalReleased ? undefined : viewportHeight || "100dvh",
+          height: viewportHeight || "100dvh",
           ["--fps-transition-ms" as string]: `${pager.transitionMs}ms`,
           ["--fps-slide-easing" as string]: FPS_SLIDE_EASING,
         }}
@@ -110,12 +105,7 @@ export function FullPageScrollRoot({
         <div
           ref={viewportRef}
           data-fps-viewport=""
-          className={cn(
-            "relative w-full",
-            pager.isTerminalReleased
-              ? "flex min-h-0 flex-1 flex-col"
-              : "h-full overflow-hidden",
-          )}
+          className="relative h-full w-full overflow-hidden"
         >
           {panels.map((panel, index) => (
             <FullPageScrollPanel

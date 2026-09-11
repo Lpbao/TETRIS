@@ -9,7 +9,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - [docs/architecture/DECISIONS.md](docs/architecture/DECISIONS.md) — **quyết định đã chốt** (đọc trước)
 - [docs/architecture/OVERVIEW.md](docs/architecture/OVERVIEW.md) — kiến trúc, stack, routing
 - [docs/architecture/CONVENTIONS.md](docs/architecture/CONVENTIONS.md) — naming, patterns, styling; **Single source of truth** (tránh hardcode layout/header)
-- [docs/architecture/FULL-PAGE-SCROLL.md](docs/architecture/FULL-PAGE-SCROLL.md) — **virtual pager** (About ✅): hooks `use-section-*`, terminal footer, section modes
+- [docs/architecture/FULL-PAGE-SCROLL.md](docs/architecture/FULL-PAGE-SCROLL.md) — **virtual pager** (About ✅): hooks `use-section-*`, section modes
 - **Full-page scroll** — Home, About, Projects, Services phải full-screen sections ([DECISIONS](docs/architecture/DECISIONS.md#full-page-scroll--landing-pages-bắt-buộc))
 
 ## Tooling

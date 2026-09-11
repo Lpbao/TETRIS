@@ -34,8 +34,5 @@ export function resetSitePage(): void {
     if (node instanceof HTMLElement) node.scrollLeft = 0;
   });
 
-  const root = document.documentElement;
-  root.removeAttribute("data-home-footer");
-  root.removeAttribute("data-projects-footer");
   document.body.style.overflow = "";
 }

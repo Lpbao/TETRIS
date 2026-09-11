@@ -28,9 +28,6 @@ export const SECTION_ENTER_SWIPE_MIN = SECTION_EXIT_SWIPE_MIN;
 /** Desktop wheel tích lũy tại anchor B trước khi về hero */
 export const WHEEL_UP_ACCUM_THRESHOLD = 80;
 
-/** Đáy nội dung Home (footer đang ẩn) — extra swipe/wheel mới hiện footer */
-export const HOME_CONTENT_END_PX = 48;
-
 export type HomeScrollDirection = "up" | "down";
 
 export type HomeRestState = "hero" | "projects-anchor" | "between" | "grid-deep";
@@ -45,8 +42,8 @@ export type HomeScrollSession = {
 let programmaticScrollGuardUntil = 0;
 
 export function getHeaderOffset(): number {
-  if (typeof document === "undefined") return 64;
-  return document.querySelector("header")?.getBoundingClientRect().height ?? 64;
+  if (typeof document === "undefined") return 90;
+  return document.querySelector("header")?.getBoundingClientRect().height ?? 90;
 }
 
 function measureCssHeight(height: string): number {
@@ -615,21 +612,4 @@ export function isCardSubstantiallyVisible(
   root?: HTMLElement | null,
 ): boolean {
   return getCardVisibleRatio(el, headerOffset, root) >= minRatio;
-}
-
-/** Đáy trang Home khi footer đang ẩn — hết `#home-projects` */
-export function isAtHomeContentEnd(): boolean {
-  const maxScroll =
-    document.documentElement.scrollHeight - window.innerHeight;
-  return window.scrollY >= Math.max(0, maxScroll - HOME_CONTENT_END_PX);
-}
-
-/** Đưa `#site-footer` vào đáy viewport (trang cuối + footer, giống About terminal) */
-export function scrollHomeFooterIntoView(): void {
-  const footer = document.getElementById("site-footer");
-  if (!footer) return;
-
-  const behavior = getHomeScrollBehavior();
-  markProgrammaticScroll(behavior);
-  footer.scrollIntoView({ block: "end", behavior });
 }
