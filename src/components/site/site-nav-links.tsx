@@ -40,6 +40,7 @@ export function SiteNavLinks({
         )}
       >
         {siteNav.map((item) => {
+          const isAdminLink = item.href.startsWith("/admin");
           const isActive =
             item.href === "/"
               ? pathname === "/"
@@ -49,10 +50,10 @@ export function SiteNavLinks({
             <li key={item.href}>
               <Link
                 href={item.href}
-                prefetch={!isActive}
+                prefetch={!isActive && !isAdminLink}
                 onClick={(event) => {
                   onNavigate?.();
-                  if (isActive) return;
+                  if (isActive || isAdminLink) return;
                   event.preventDefault();
                   navigateWithLoading(item.href);
                 }}

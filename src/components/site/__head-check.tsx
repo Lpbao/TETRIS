@@ -18,7 +18,7 @@ export const MENU_LINK_ANIM_MS = 300;
 export const MENU_LINKS_CLOSE_MS = 180;
 
 export const MENU_OPEN_SEQUENCE_MS =
-  MENU_CHROME_MS + MENU_LINK_ANIM_MS + 4 * MENU_LINK_STAGGER_MS;
+  MENU_CHROME_MS + MENU_LINK_ANIM_MS + 5 * MENU_LINK_STAGGER_MS;
 
 /** Panel giữ opaque đến hết — tránh carousel flash khi chrome revert (P2 #9) */
 export const MENU_CLOSE_SEQUENCE_MS = MENU_LINKS_CLOSE_MS + MENU_CHROME_MS;

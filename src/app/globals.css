@@ -1494,6 +1494,9 @@ html:has(#hero-carousel) body {
 .mobile-menu-links[data-phase="opening"] li:nth-child(5) {
   transition-delay: 200ms;
 }
+.mobile-menu-links[data-phase="opening"] li:nth-child(6) {
+  transition-delay: 250ms;
+}
 
 .mobile-menu-links[data-phase="open"] li {
   transition-delay: 0ms;

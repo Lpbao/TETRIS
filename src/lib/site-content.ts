@@ -26,6 +26,7 @@ export const siteNav = [
   { label: "DỰ ÁN", href: "/projects" },
   { label: "DỊCH VỤ", href: "/services" },
   { label: "LIÊN HỆ", href: "/contact" },
+  { label: "LOGIN", href: "/admin/login" },
 ] as const;
 
 export const siteContact = {
