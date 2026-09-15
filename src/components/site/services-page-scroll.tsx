@@ -31,6 +31,7 @@ export function ServicesPageScroll({
         imageAlt={service.imageAlt}
         reverse={index % 2 === 1}
         fullPage
+        priority={index === 0}
         sectionId={sections[index]!.id}
         showFooter={index === lastIndex}
         contact={index === lastIndex ? contact : undefined}

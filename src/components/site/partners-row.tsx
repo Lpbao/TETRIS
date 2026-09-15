@@ -1,7 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { MovingLettersPop } from "@/components/site/moving-letters";
+import { ProgressiveImage } from "@/components/site/progressive-image";
+import {
+  PARTNER_LOGO_FULL_WIDTH,
+  PARTNER_LOGO_PREVIEW_WIDTH,
+} from "@/lib/optimized-image-src";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 import { Autoplay, FreeMode } from "swiper/modules";
@@ -41,10 +45,12 @@ function buildLoopSlides(partners: readonly Partner[]): Partner[] {
 function PartnerLogo({ name, logo }: Partner) {
   return (
     <div className="relative h-16 w-full md:h-24 lg:h-28">
-      <Image
+      <ProgressiveImage
         src={logo}
         alt={name}
-        fill
+        previewWidth={PARTNER_LOGO_PREVIEW_WIDTH}
+        fullWidth={PARTNER_LOGO_FULL_WIDTH}
+        fade={false}
         className="object-contain object-center"
         sizes="(min-width: 1024px) 200px, (min-width: 768px) 160px, 30vw"
       />

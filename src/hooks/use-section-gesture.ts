@@ -41,6 +41,12 @@ function isSiteChromeTouch(target: EventTarget | null): boolean {
   );
 }
 
+/** Canvas giữ wheel/touch để zoom — không chuyển màn pager. */
+function isInfiniteCanvasGesture(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest("[data-infinite-canvas]"));
+}
+
 function getInnerScrollEl(eventTarget: EventTarget | null): HTMLElement | null {
   if (!(eventTarget instanceof Element)) return null;
   const el = eventTarget.closest("[data-fps-inner-scroll]");
@@ -122,7 +128,7 @@ export function useSectionGesture({
     };
 
     const onTouchStart = (event: TouchEvent) => {
-      if (isSiteChromeTouch(event.target)) {
+      if (isSiteChromeTouch(event.target) || isInfiniteCanvasGesture(event.target)) {
         resetTouch();
         return;
       }
@@ -145,6 +151,7 @@ export function useSectionGesture({
     };
 
     const onTouchMove = (event: TouchEvent) => {
+      if (isInfiniteCanvasGesture(event.target)) return;
       const origin = touchOriginRef.current;
       const touch = event.touches[0];
       if (!origin || !touch) return;
@@ -213,7 +220,7 @@ export function useSectionGesture({
     };
 
     const finishTouch = (event: TouchEvent) => {
-      if (isSiteChromeTouch(event.target)) {
+      if (isSiteChromeTouch(event.target) || isInfiniteCanvasGesture(event.target)) {
         resetTouch();
         return;
       }
@@ -271,6 +278,7 @@ export function useSectionGesture({
     };
 
     const onWheel = (event: WheelEvent) => {
+      if (isInfiniteCanvasGesture(event.target)) return;
       const p = pagerRef.current;
       if (p.isTransitioning) return;
       if (Math.abs(event.deltaY) < FPS_WHEEL_NOTCH_MIN) return;

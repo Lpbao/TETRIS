@@ -35,27 +35,37 @@ model Category {
   @@index([sortOrder])
 }
 
+/// Layout gallery trang chi tiết dự án (`/projects/[slug]`).
+/// LAYOUT1 = hiện tại (GSAP grid); LAYOUTDEFAULT = stack ảnh static; LAYOUT2 = chưa FE.
+enum PostLayoutStyle {
+  LAYOUTDEFAULT
+  LAYOUT1
+  LAYOUT2
+}
+
 /// Bài đăng = dự án / portfolio (title, address, concept, category, description, images).
 /// content + excerpt: deprecated — form/API admin không ghi; giữ cột cho /blog.
 model Post {
-  id          String    @id @default(cuid())
+  id          String          @id @default(cuid())
   title       String
-  slug        String    @unique
-  address     String    @default("")
-  concept     String    @default("")
-  description String    @default("") @db.Text
+  slug        String          @unique
+  address     String          @default("")
+  concept     String          @default("")
+  description String          @default("") @db.Text
   coverImage  String?
   /// Gallery — map `SiteProject.gallery`
-  images      String[]  @default([])
-  published   Boolean   @default(false)
+  images      String[]        @default([])
+  /// Gallery layout trên trang detail — map `SiteProject.layoutStyle`
+  layoutStyle PostLayoutStyle @default(LAYOUT1)
+  published   Boolean         @default(false)
   categoryId  String?
-  category    Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category    Category?       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   /// @deprecated — không dùng form/API admin; /blog còn đọc
-  content     String?   @db.Text
+  content     String?         @db.Text
   /// @deprecated — không dùng form/API admin; /blog còn đọc
   excerpt     String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   @@index([published, createdAt(sort: Desc)])
   @@index([slug])

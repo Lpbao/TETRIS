@@ -132,10 +132,12 @@ function ensureBrandBreakScrollRoom(root: HTMLElement) {
   const track = root.querySelector("[data-morph-pin-track]");
   if (!(scroller instanceof HTMLElement)) return;
   const vvh = Math.max(scroller.clientHeight, 1);
-  const letterRatio = Math.max(
-    0,
-    readCssNumber(root, "--morph-pin-letter-ratio", 0.35),
-  );
+  const targetPx = readCssNumber(root, "--brand-break-letter-px", 200);
+  const minR = readCssNumber(root, "--brand-break-letter-ratio-min", 0.16);
+  const maxR = readCssNumber(root, "--brand-break-letter-ratio-max", 0.28);
+  let letterRatio = targetPx / vvh;
+  if (letterRatio < minR) letterRatio = minR;
+  if (letterRatio > maxR) letterRatio = maxR;
   const imageRatio = Math.max(
     0.01,
     readCssNumber(root, "--morph-pin-image-ratio", 1),
@@ -147,6 +149,7 @@ function ensureBrandBreakScrollRoom(root: HTMLElement) {
   const collapse = vvh * (letterRatio + imageRatio / alignSpeed);
   root.style.setProperty("--morph-pin-vvh", `${Math.round(vvh)}px`);
   root.style.setProperty("--morph-pin-collapse", `${Math.round(collapse)}px`);
+  root.style.setProperty("--morph-pin-letter-ratio-used", String(letterRatio));
   if (track instanceof HTMLElement) {
     track.style.removeProperty("height");
     track.style.removeProperty("min-height");

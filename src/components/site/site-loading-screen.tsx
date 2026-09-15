@@ -7,7 +7,7 @@ import {
 
 interface SiteLoadingScreenProps {
   rootRef?: Ref<HTMLDivElement>;
-  /** Tự ẩn sau `--sl-autodismiss-ms` — intro/overlay, không dùng cho chờ RSC lâu */
+  /** Tự ẩn sau `--sl-dismiss-ms` — intro/overlay timer mode */
   autoDismiss?: boolean;
 }
 

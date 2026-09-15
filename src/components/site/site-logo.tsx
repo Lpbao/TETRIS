@@ -14,13 +14,14 @@ export function SiteLogo({ className, inverted, prefetch = true }: SiteLogoProps
     <Link
       href="/"
       prefetch={prefetch}
+      aria-label={siteBrand.name}
       className={cn(
-        "site-header-logo uppercase transition-colors duration-300 motion-reduce:transition-none",
-        inverted ? "text-white" : "text-foreground",
+        "site-header-logo text-foreground transition-colors duration-300 motion-reduce:transition-none",
+        inverted && "text-white",
         className,
       )}
     >
-      <span className="site-header-logo-label">{siteBrand.name}</span>
+      <span className="site-header-logo-mark" aria-hidden />
     </Link>
   );
 }

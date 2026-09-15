@@ -3,6 +3,7 @@ import {
   type SiteProject,
   projectCategories,
 } from "@/lib/site-content";
+import type { PostLayoutStyle } from "@/lib/validations/post";
 
 const PROJECT_CATEGORY_IDS = new Set<string>(
   projectCategories.map((category) => category.id),
@@ -16,6 +17,7 @@ export const postForSiteProjectSelect = {
   description: true,
   coverImage: true,
   images: true,
+  layoutStyle: true,
   categoryId: true,
   category: { select: { slug: true, name: true } },
 } as const;
@@ -28,6 +30,7 @@ export type PostForSiteProject = {
   description: string;
   coverImage: string | null;
   images: string[];
+  layoutStyle?: PostLayoutStyle;
   categoryId?: string | null;
   category: { slug: string; name: string } | null;
 };
@@ -57,5 +60,6 @@ export function mapPostToSiteProject(post: PostForSiteProject): SiteProject {
     heroImage: post.coverImage?.trim() || undefined,
     description: post.description,
     images: post.images,
+    layoutStyle: post.layoutStyle ?? "LAYOUT1",
   };
 }

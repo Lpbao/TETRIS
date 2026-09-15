@@ -65,6 +65,7 @@ export async function PUT(request: Request, context: RouteContext) {
       slug,
       coverImage,
       images,
+      layoutStyle,
       published,
       address,
       concept,
@@ -120,6 +121,7 @@ export async function PUT(request: Request, context: RouteContext) {
         categoryId,
         coverImage: coverImage || null,
         images,
+        layoutStyle,
         published,
       },
     });

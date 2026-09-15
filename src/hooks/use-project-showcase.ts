@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SiteProject } from "@/lib/site-content";
 
-/** Số dự án mỗi trang trên `/projects`. */
+/** Số dự án mỗi lần hiện thêm trên `/projects`. */
 export const PROJECT_SHOWCASE_PAGE_SIZE = 10;
 
 export interface UseProjectShowcaseOptions {
   projects: readonly SiteProject[];
   tabsDisplay?: boolean;
   showSearch?: boolean;
-  showPagination?: boolean;
+  /** Nối thêm từng đợt khi cuộn tới cuối. Home / related để false. */
+  infinite?: boolean;
   scrollEffectMode?: boolean;
   pageSize?: number;
 }
@@ -19,12 +20,13 @@ export function useProjectShowcase({
   projects,
   tabsDisplay = false,
   showSearch = false,
-  showPagination = false,
+  infinite = false,
   scrollEffectMode = false,
   pageSize = PROJECT_SHOWCASE_PAGE_SIZE,
 }: UseProjectShowcaseOptions) {
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const listKey = projects.map((project) => project.slug).join("\0");
 
   const filtered = useMemo(() => {
     if (!showSearch) return [...projects];
@@ -40,34 +42,32 @@ export function useProjectShowcase({
 
   const total = filtered.length;
 
-  const pageCount = showPagination
-    ? Math.max(1, Math.ceil(total / pageSize))
-    : 1;
-
-  const safePage = Math.min(page, pageCount);
-
   const visible = useMemo(() => {
-    if (!showPagination) return filtered;
-    const start = (safePage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, safePage, pageSize, showPagination]);
+    if (!infinite) return filtered;
+    return filtered.slice(0, visibleCount);
+  }, [filtered, infinite, visibleCount]);
+
+  const hasMore = infinite && visible.length < total;
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((count) => Math.min(count + pageSize, total));
+  }, [pageSize, total]);
 
   useEffect(() => {
-    setPage(1);
-  }, [query, projects]);
+    setVisibleCount(pageSize);
+  }, [listKey, pageSize, query]);
 
   return {
     visible,
     query,
     setQuery,
-    page: safePage,
-    pageCount,
-    setPage,
-    pageSize,
     total,
+    hasMore,
+    loadMore,
+    visibleCount,
     mode: scrollEffectMode ? ("scroll" as const) : ("grid" as const),
     tabsDisplay,
     showSearch,
-    showPagination,
+    infinite,
   };
 }

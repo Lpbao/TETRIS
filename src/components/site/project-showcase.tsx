@@ -1,10 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { HomeProjectCurtainList } from "@/components/site/home-project-curtain-list";
 import { ProjectDetailRelated } from "@/components/site/project-detail-related";
 import { ProjectFilter } from "@/components/site/project-filter";
-import { ProjectPagination } from "@/components/site/project-pagination";
 import { Input } from "@/components/ui/input";
 import { useProjectShowcase } from "@/hooks/use-project-showcase";
 import type { SiteProject } from "@/lib/site-content";
@@ -17,7 +16,8 @@ export interface ProjectShowcaseProps {
   layout?: "home" | "page";
   tabsDisplay?: boolean;
   showSearch?: boolean;
-  showPagination?: boolean;
+  /** `/projects` — hiện thêm khi cuộn tới cuối. */
+  infinite?: boolean;
   scrollEffectMode?: boolean;
   emptyMessage?: string;
 }
@@ -29,7 +29,7 @@ export function ProjectShowcase({
   layout = "page",
   tabsDisplay = false,
   showSearch = false,
-  showPagination = false,
+  infinite = false,
   scrollEffectMode = false,
   emptyMessage = "Chưa có dự án trong danh mục này.",
 }: ProjectShowcaseProps) {
@@ -37,17 +37,16 @@ export function ProjectShowcase({
     visible,
     query,
     setQuery,
-    page,
-    pageCount,
-    setPage,
-    pageSize,
     total,
+    hasMore,
+    loadMore,
+    visibleCount,
     mode,
   } = useProjectShowcase({
     projects,
     tabsDisplay,
     showSearch,
-    showPagination,
+    infinite,
     scrollEffectMode,
   });
 
@@ -112,15 +111,66 @@ export function ProjectShowcase({
         )}
       </div>
 
-      {showPagination && total > 0 ? (
-        <ProjectPagination
-          page={page}
-          pageCount={pageCount}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={setPage}
+      {infinite && total > 0 ? (
+        <ProjectInfiniteSentinel
+          hasMore={hasMore}
+          visibleCount={visibleCount}
+          onLoadMore={loadMore}
         />
       ) : null}
     </section>
+  );
+}
+
+function ProjectInfiniteSentinel({
+  hasMore,
+  visibleCount,
+  onLoadMore,
+}: {
+  hasMore: boolean;
+  visibleCount: number;
+  onLoadMore: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const onLoadMoreRef = useRef(onLoadMore);
+  const requestedCount = useRef(-1);
+  onLoadMoreRef.current = onLoadMore;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !hasMore) return;
+    if (requestedCount.current > visibleCount) requestedCount.current = -1;
+
+    let cancelled = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (cancelled || !entries.some((entry) => entry.isIntersecting)) return;
+        if (requestedCount.current === visibleCount) return;
+        requestedCount.current = visibleCount;
+        cancelled = true;
+        observer.disconnect();
+        onLoadMoreRef.current();
+      },
+      { root: null, rootMargin: "240px 0px" },
+    );
+    observer.observe(el);
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [hasMore, visibleCount]);
+
+  if (!hasMore) return null;
+
+  return (
+    <div
+      ref={ref}
+      className="mx-auto w-full max-w-6xl px-4 py-4 text-center text-sm text-muted-foreground"
+      role="status"
+      aria-live="polite"
+    >
+      Đang tải thêm
+    </div>
   );
 }

@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       slug,
       coverImage,
       images,
+      layoutStyle,
       published,
       address,
       concept,
@@ -115,6 +116,7 @@ export async function POST(request: Request) {
         categoryId,
         coverImage: coverImage || null,
         images,
+        layoutStyle,
         published,
       },
     });

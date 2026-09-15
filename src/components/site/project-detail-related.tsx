@@ -58,6 +58,9 @@ export function ProjectDetailRelated({
 
     gsap.registerPlugin(ScrollTrigger);
 
+    const scroller = root.closest<HTMLElement>("[data-fps-inner-scroll]");
+    const scrollTrigger = scroller ? { scroller } : {};
+
     const ctx = gsap.context(() => {
       const textElement = root.querySelector<HTMLElement>(".text");
       const chars = textElement?.querySelectorAll<HTMLElement>(".char");
@@ -67,10 +70,12 @@ export function ProjectDetailRelated({
         gsap
           .timeline({
             scrollTrigger: {
+              ...scrollTrigger,
               trigger: textElement,
               start: "top 90%",
               end: "top 45%",
               scrub: true,
+              invalidateOnRefresh: true,
             },
           })
           .fromTo(
@@ -117,10 +122,12 @@ export function ProjectDetailRelated({
         gsap
           .timeline({
             scrollTrigger: {
+              ...scrollTrigger,
               trigger: gridFull,
               start: "top bottom",
               end: "center center",
               scrub: true,
+              invalidateOnRefresh: true,
             },
           })
           .from(columnItems, {
@@ -144,9 +151,22 @@ export function ProjectDetailRelated({
     const raf = window.requestAnimationFrame(refresh);
     window.addEventListener("resize", refresh);
 
+    const panel = root.closest<HTMLElement>("[data-fps-panel]");
+    const motionObserver = panel
+      ? new MutationObserver(() => {
+          const motion = panel.getAttribute("data-fps-motion");
+          if (motion === "active" || motion === "entering") refresh();
+        })
+      : null;
+    motionObserver?.observe(panel!, {
+      attributes: true,
+      attributeFilter: ["data-fps-motion"],
+    });
+
     return () => {
       window.cancelAnimationFrame(raf);
       window.removeEventListener("resize", refresh);
+      motionObserver?.disconnect();
       ctx.revert();
     };
   }, [cells.length, isDesktop, reduced]);

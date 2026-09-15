@@ -38,6 +38,42 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Brand-break: letter-ratio theo chiều cao scroller (target px → ratio clamp).
+ * Hero (letter-ratio CSS = 0) không gọi.
+ */
+function resolveBrandBreakLetterRatio(root: HTMLElement, vvh: number): number {
+  const fallback = readCssNumber(root, "--morph-pin-letter-ratio", 0.24);
+  if (vvh < 1) return fallback;
+  const targetPx = readCssNumber(root, "--brand-break-letter-px", 200);
+  const minR = readCssNumber(root, "--brand-break-letter-ratio-min", 0.16);
+  const maxR = readCssNumber(root, "--brand-break-letter-ratio-max", 0.28);
+  return clamp(targetPx / vvh, minR, maxR);
+}
+
+/**
+ * Exit soft-stagger top→mid→bot trên [0, finishAt] của letter phase.
+ */
+function staggerLetterExitProgress(
+  pLetter: number,
+  blockIndex: number,
+  stagger = 0.1,
+  finishAt = 1,
+): number {
+  const s = Math.min(0.3, Math.max(0, stagger));
+  const end = Math.min(1, Math.max(s * 2 + 0.05, finishAt));
+  const span = Math.max(0.01, end - 2 * s);
+  return clamp01((pLetter - blockIndex * s) / span);
+}
+
+function letterExitPx(progress: number, vw: number): string {
+  return `${(Math.round(-progress * vw * 10) / 10).toFixed(1)}px`;
+}
+
 /** Đáy photo đã paint (object-contain), không phải đáy khung wrapper. */
 function measureVisualImageBottom(wrapper: HTMLElement): number {
   const img = wrapper.querySelector("img");
@@ -163,6 +199,8 @@ export function useMorphPinScroll(sectionId: string) {
   const lastMeasureProgressRef = useRef({ pShrink: -1, pAlign: -1 });
   const lastVvhRef = useRef(0);
   const shiftRef = useRef(0);
+  const lastPhotoClipRef = useRef("0%");
+  const lastClipShrinkRef = useRef(-1);
   const { pager, getPanelMotionState } = useFullPageScroll();
   const index = pager.sections.findIndex((section) => section.id === sectionId);
   const motion = index >= 0 ? getPanelMotionState(index) : "inactive";
@@ -195,10 +233,14 @@ export function useMorphPinScroll(sectionId: string) {
         vvh = prevVvh;
       }
 
-      const letterRatio = Math.max(
+      const cssLetterRatio = Math.max(
         0,
         readCssNumber(root, "--morph-pin-letter-ratio", 0),
       );
+      const letterRatio =
+        cssLetterRatio > 0 && root.hasAttribute("data-brand-break")
+          ? resolveBrandBreakLetterRatio(root, vvh)
+          : cssLetterRatio;
       const imageRatio = readPositiveRatio(
         root,
         "--morph-pin-image-ratio",
@@ -239,6 +281,9 @@ export function useMorphPinScroll(sectionId: string) {
         lastMeasureProgressRef.current = { pShrink: -1, pAlign: -1 };
       }
       lastVvhRef.current = vvh;
+      if (letterRatio > 0) {
+        setCssVar(root, "--morph-pin-letter-ratio-used", String(letterRatio));
+      }
 
       const scrollTop = scroller.scrollTop;
 
@@ -299,12 +344,32 @@ export function useMorphPinScroll(sectionId: string) {
       setCssVar(root, "--morph-pin-p-image", String(pImage));
       setCssVar(root, "--morph-pin-p-shrink", String(pShrink));
       setCssVar(root, "--morph-pin-p-top", String(pTop));
-      /* iOS: tránh calc(p * -1 * 100vw) — ghi thẳng px cho face exit */
-      setCssVar(
-        root,
-        "--morph-pin-letter-x",
-        `${Math.round(-pLetter * (window.visualViewport?.width ?? window.innerWidth))}px`,
-      );
+      /* iOS: px thẳng; soft-stagger exit khi có letter phase (brand-break) */
+      if (letterRatio > 0) {
+        const vw = window.visualViewport?.width ?? window.innerWidth;
+        const exitStagger = readCssNumber(
+          root,
+          "--brand-break-exit-stagger",
+          0.1,
+        );
+        const exitFinish = readCssNumber(
+          root,
+          "--brand-break-exit-finish",
+          1,
+        );
+        setCssVar(root, "--morph-pin-letter-x", letterExitPx(pLetter, vw));
+        for (const [i, id] of (["top", "mid", "bot"] as const).entries()) {
+          const p = staggerLetterExitProgress(
+            pLetter,
+            i,
+            exitStagger,
+            exitFinish,
+          );
+          setCssVar(root, `--morph-pin-letter-x-${id}`, letterExitPx(p, vw));
+        }
+      } else {
+        setCssVar(root, "--morph-pin-letter-x", "0px");
+      }
 
       let contentShift = 0;
       if (lettersOut) {
@@ -361,11 +426,19 @@ export function useMorphPinScroll(sectionId: string) {
       setCssVar(root, "--morph-pin-collapse", `${alignUnstick}px`);
       setCssVar(root, "--morph-pin-content-shift", `${contentShift}px`);
       const skipClip = isCoarsePointer();
-      setCssVar(
-        root,
-        "--morph-pin-photo-clip",
-        !skipClip && lettersOut ? `${measurePhotoClipPercent(root)}%` : "0%",
-      );
+      if (skipClip || !lettersOut) {
+        lastPhotoClipRef.current = "0%";
+        lastClipShrinkRef.current = -1;
+        setCssVar(root, "--morph-pin-photo-clip", "0%");
+      } else if (
+        Math.abs(pShrink - lastClipShrinkRef.current) > 0.02 ||
+        lastPhotoClipRef.current === "0%"
+      ) {
+        const next = `${measurePhotoClipPercent(root)}%`;
+        lastPhotoClipRef.current = next;
+        lastClipShrinkRef.current = pShrink;
+        setCssVar(root, "--morph-pin-photo-clip", next);
+      }
     };
 
     const onScroll = () => {

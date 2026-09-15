@@ -13,6 +13,7 @@ import {
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { SiteLoadingRun } from "@/components/site/site-loading-run";
+import { readSiteLoadingDismissMs } from "@/lib/site-loading-timing";
 
 export type NavigateWithLoadingOptions = {
   /** Mặc định `true`. Category tabs: `false`. */
@@ -23,7 +24,8 @@ interface SiteLoadingContextValue {
   show: () => void;
   /**
    * Loading trước → paint → rồi `router.push`.
-   * Ẩn khi URL đích khớp và `main` không còn `[data-site-loading]` (Suspense / loading.tsx xong).
+   * Ẩn khi URL đích khớp và `main` không còn `[data-site-loading]` (Suspense / loading.tsx xong),
+   * rồi chờ `--sl-dismiss-ms` (7s) trước khi unmount overlay.
    */
   navigateWithLoading: (
     href: string,
@@ -53,18 +55,41 @@ export function SiteLoadingProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<LoadingMode>("timer");
   const pendingHrefRef = useRef<string | null>(null);
+  const dismissTimerRef = useRef<number | null>(null);
+  const dismissScheduledRef = useRef(false);
 
-  const hide = useCallback(() => {
+  const clearDismissTimer = useCallback(() => {
+    if (dismissTimerRef.current != null) {
+      window.clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+  }, []);
+
+  const hideNow = useCallback(() => {
+    clearDismissTimer();
+    dismissScheduledRef.current = false;
     pendingHrefRef.current = null;
     setOpen(false);
     setMode("timer");
-  }, []);
+  }, [clearDismissTimer]);
+
+  /** Route ready / failsafe: chờ `--sl-dismiss-ms` rồi unmount. */
+  const hideAfterDismissDelay = useCallback(() => {
+    if (dismissScheduledRef.current) return;
+    dismissScheduledRef.current = true;
+    clearDismissTimer();
+    const root = document.querySelector("[data-site-loading]");
+    const dismissMs = readSiteLoadingDismissMs(root);
+    dismissTimerRef.current = window.setTimeout(hideNow, dismissMs);
+  }, [clearDismissTimer, hideNow]);
 
   const show = useCallback(() => {
+    clearDismissTimer();
+    dismissScheduledRef.current = false;
     pendingHrefRef.current = null;
     setMode("timer");
     setOpen(true);
-  }, []);
+  }, [clearDismissTimer]);
 
   const navigateWithLoading = useCallback(
     (href: string, options?: NavigateWithLoadingOptions) => {
@@ -72,6 +97,8 @@ export function SiteLoadingProvider({ children }: { children: ReactNode }) {
       if (locationMatchesHref(href)) return;
 
       const scroll = options?.scroll ?? true;
+      clearDismissTimer();
+      dismissScheduledRef.current = false;
       pendingHrefRef.current = href;
 
       flushSync(() => {
@@ -85,28 +112,34 @@ export function SiteLoadingProvider({ children }: { children: ReactNode }) {
         });
       });
     },
-    [router],
+    [router, clearDismissTimer],
   );
 
   useEffect(() => {
     if (!open || mode !== "route") return;
 
     let raf = 0;
+    let finished = false;
     const failsafe = window.setTimeout(() => {
-      hide();
+      finished = true;
+      hideAfterDismissDelay();
     }, ROUTE_LOADING_FAILSAFE_MS);
 
     const tick = () => {
+      if (finished || dismissScheduledRef.current) return;
+
       const pending = pendingHrefRef.current;
       if (!pending) {
-        hide();
+        finished = true;
+        hideAfterDismissDelay();
         return;
       }
 
       if (locationMatchesHref(pending)) {
         const busy = document.querySelector("main [data-site-loading]");
         if (!busy) {
-          hide();
+          finished = true;
+          hideAfterDismissDelay();
           return;
         }
       }
@@ -120,7 +153,9 @@ export function SiteLoadingProvider({ children }: { children: ReactNode }) {
       window.cancelAnimationFrame(raf);
       window.clearTimeout(failsafe);
     };
-  }, [open, mode, hide]);
+  }, [open, mode, hideAfterDismissDelay]);
+
+  useEffect(() => () => clearDismissTimer(), [clearDismissTimer]);
 
   const value = useMemo(
     () => ({ show, navigateWithLoading }),
@@ -131,7 +166,7 @@ export function SiteLoadingProvider({ children }: { children: ReactNode }) {
     <SiteLoadingContext.Provider value={value}>
       {open ? (
         <SiteLoadingRun
-          onDone={hide}
+          onDone={hideNow}
           dismissOnTimer={mode === "timer"}
         />
       ) : null}

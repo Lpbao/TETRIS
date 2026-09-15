@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { SiteFooter } from "@/components/site/site-footer";
-import { SiteImage } from "@/components/site/site-image";
+import { ProgressiveImage } from "@/components/site/progressive-image";
 import { useSectionEnterOnce } from "@/hooks/use-section-enter-once";
+import {
+  CANVAS_FULL_WIDTH,
+  CANVAS_PREVIEW_WIDTH,
+} from "@/lib/optimized-image-src";
 import type { ContactPageContent } from "@/lib/validations/site-page";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +19,8 @@ interface ServiceSectionProps {
   reverse?: boolean;
   /** Full viewport panel inside virtual pager (Services page) */
   fullPage?: boolean;
+  /** Preview của màn đầu — không đặt priority lên mọi panel. */
+  priority?: boolean;
   sectionId: string;
   className?: string;
   /** Màn cuối — footer dưới block + min-height copy */
@@ -24,6 +30,8 @@ interface ServiceSectionProps {
 
 /** Không để opacity:0 mãi nếu enter-once / animation kẹt (hay gặp trên phone). */
 const PLAY_FAILSAFE_MS = 1200;
+/** Khớp `focus-in-expand` — lớp nét chỉ gắn sau khi enter xong. */
+const ENTER_SETTLE_MS = 800;
 
 function shouldSkipEnterAnimation(): boolean {
   if (typeof window === "undefined") return false;
@@ -41,6 +49,7 @@ export function ServiceSection({
   imageAlt,
   reverse = false,
   fullPage = false,
+  priority = false,
   sectionId,
   className,
   showFooter = false,
@@ -48,6 +57,7 @@ export function ServiceSection({
 }: ServiceSectionProps) {
   const entered = useSectionEnterOnce(sectionId);
   const [play, setPlay] = useState(false);
+  const [enterSettled, setEnterSettled] = useState(false);
 
   useEffect(() => {
     if (play) return;
@@ -75,6 +85,16 @@ export function ServiceSection({
     };
   }, [entered, play]);
 
+  useEffect(() => {
+    if (!play) return;
+    if (shouldSkipEnterAnimation()) {
+      setEnterSettled(true);
+      return;
+    }
+    const id = window.setTimeout(() => setEnterSettled(true), ENTER_SETTLE_MS);
+    return () => window.clearTimeout(id);
+  }, [play]);
+
   return (
     <section
       data-services-last={showFooter ? "" : undefined}
@@ -100,13 +120,15 @@ export function ServiceSection({
           data-service-media=""
           className="relative aspect-[4/3] w-full overflow-hidden"
         >
-          <SiteImage
+          <ProgressiveImage
             src={image}
             alt={imageAlt}
-            fill
-            grayscale
-            blur={false}
-            className="object-cover"
+            previewWidth={CANVAS_PREVIEW_WIDTH}
+            fullWidth={CANVAS_FULL_WIDTH}
+            loadFull={enterSettled}
+            fade={false}
+            priority={priority}
+            className="object-cover grayscale"
             sizes="(max-width: 768px) 100vw, 50vw"
           />
         </div>

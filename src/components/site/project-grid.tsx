@@ -12,7 +12,7 @@ interface ProjectGridProps {
   id?: string;
   tabsDisplay?: boolean;
   showSearch?: boolean;
-  showPagination?: boolean;
+  infinite?: boolean;
   scrollEffectMode?: boolean;
 }
 
@@ -25,7 +25,7 @@ export function ProjectGrid({
   id,
   tabsDisplay,
   showSearch,
-  showPagination,
+  infinite,
   scrollEffectMode,
 }: ProjectGridProps) {
   const layout: ProjectShowcaseProps["layout"] =
@@ -40,7 +40,7 @@ export function ProjectGrid({
       emptyMessage={emptyMessage}
       tabsDisplay={tabsDisplay}
       showSearch={showSearch}
-      showPagination={showPagination}
+      infinite={infinite}
       scrollEffectMode={scrollEffectMode}
     />
   );

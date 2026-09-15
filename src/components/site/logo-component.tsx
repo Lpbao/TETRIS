@@ -23,8 +23,8 @@ interface LogoComponentProps {
 
 /**
  * 3 khối Tetris cứng (top / mid / bot).
- * Enter: cả khối trượt từ phải vào đích.
- * Scroll: face trượt từ đích ra phải rồi ẩn — không clip/co chiều rộng.
+ * Enter: cả khối trượt từ phải vào đích (stagger).
+ * Scroll: face trượt từ đích ra trái tuần tự top→mid→bot — không clip/co chiều rộng.
  */
 export function LogoComponent({ className }: LogoComponentProps) {
   return (

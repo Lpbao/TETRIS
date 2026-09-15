@@ -4,18 +4,11 @@ import { useEffect, useRef } from "react";
 import { SiteLoadingScreen } from "@/components/site/site-loading-screen";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { subscribeSiteViewportHeight } from "@/lib/home-scroll";
-
-function cssTimeToMs(value: string) {
-  const token = value.trim();
-  if (token.endsWith("ms")) return Number.parseFloat(token);
-  if (token.endsWith("s")) return Number.parseFloat(token) * 1000;
-  const numeric = Number.parseFloat(token);
-  return Number.isFinite(numeric) ? numeric : 0;
-}
+import { readSiteLoadingDismissMs } from "@/lib/site-loading-timing";
 
 interface SiteLoadingRunProps {
   onDone: () => void;
-  /** Intro / `show()` — tự ẩn theo token. Route nav: `false` (chờ data). */
+  /** Intro / `show()` — tự ẩn theo token. Route nav: `false` (chờ data rồi delay dismiss). */
   dismissOnTimer?: boolean;
 }
 
@@ -36,15 +29,8 @@ export function SiteLoadingRun({
       return;
     }
 
-    const root = rootRef.current;
-    const styles = root ? getComputedStyle(root) : null;
-    const dismissMs = cssTimeToMs(
-      styles?.getPropertyValue("--sl-autodismiss-ms") ?? "0.6s",
-    );
-    const id = window.setTimeout(
-      onDone,
-      Number.isFinite(dismissMs) && dismissMs > 0 ? dismissMs : 600,
-    );
+    const dismissMs = readSiteLoadingDismissMs(rootRef.current);
+    const id = window.setTimeout(onDone, dismissMs);
 
     return () => window.clearTimeout(id);
   }, [onDone, reducedMotion, dismissOnTimer]);

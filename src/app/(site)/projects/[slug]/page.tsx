@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { ProjectDetailContent } from "@/components/site/project-detail-content";
 import { ProjectDetailCover } from "@/components/site/project-detail-cover";
 import { ProjectDetailImages } from "@/components/site/project-detail-images";
+import { ProjectDetailImagesDefault } from "@/components/site/project-detail-images-default";
+import { ProjectDetailLayout2Scroll } from "@/components/site/project-detail-layout2-scroll";
 import { ProjectShowcase } from "@/components/site/project-showcase";
+import { SiteFooter } from "@/components/site/site-footer";
 import {
   getPublishedProjectSlugs,
   getRelatedSiteProjects,
   getSiteProjectBySlug,
 } from "@/lib/get-site-project";
+import { getSiteContact } from "@/lib/get-site-contact";
 import { getProjectCover, getProjectImages } from "@/lib/site-content";
 import { createPageMetadata } from "@/lib/site-metadata";
 
@@ -49,7 +54,10 @@ export default async function ProjectDetailPage({
   params,
 }: ProjectDetailPageProps) {
   const { slug } = await params;
-  const project = await getSiteProjectBySlug(slug);
+  const [project, contact] = await Promise.all([
+    getSiteProjectBySlug(slug),
+    getSiteContact(),
+  ]);
 
   if (!project) {
     notFound();
@@ -57,6 +65,32 @@ export default async function ProjectDetailPage({
 
   const images = getProjectImages(project);
   const related = await getRelatedSiteProjects(project);
+  const layoutStyle = project.layoutStyle ?? "LAYOUT1";
+
+  if (layoutStyle === "LAYOUT2") {
+    return (
+      <ProjectDetailLayout2Scroll
+        title={project.title}
+        coverSrc={getProjectCover(project)}
+        concept={project.categoryLabel}
+        address={project.location}
+        description={project.description ?? ""}
+        images={images}
+        related={related}
+        contact={contact}
+      />
+    );
+  }
+
+  let gallery: ReactNode = null;
+  if (images.length > 0) {
+    gallery =
+      layoutStyle === "LAYOUTDEFAULT" ? (
+        <ProjectDetailImagesDefault images={images} title={project.title} />
+      ) : (
+        <ProjectDetailImages images={images} title={project.title} />
+      );
+  }
 
   return (
     <article data-project-detail>
@@ -67,9 +101,7 @@ export default async function ProjectDetailPage({
         address={project.location}
       />
 
-      {images.length > 0 ? (
-        <ProjectDetailImages images={images} title={project.title} />
-      ) : null}
+      {gallery}
 
       {project.description ? (
         <ProjectDetailContent
@@ -80,6 +112,8 @@ export default async function ProjectDetailPage({
       ) : null}
 
       <ProjectShowcase projects={related} scrollEffectMode />
+
+      <SiteFooter contact={contact} />
     </article>
   );
 }

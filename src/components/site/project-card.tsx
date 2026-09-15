@@ -1,6 +1,11 @@
 import Image from "next/image";
 import { ProjectCardLink } from "@/components/site/project-card-link";
+import { ProgressiveImage } from "@/components/site/progressive-image";
 import type { SiteProject } from "@/lib/site-content";
+import {
+  HOME_CARD_FULL_WIDTH,
+  HOME_CARD_PREVIEW_WIDTH,
+} from "@/lib/optimized-image-src";
 import { cn } from "@/lib/utils";
 
 interface ProjectCardProps {
@@ -9,6 +14,8 @@ interface ProjectCardProps {
   variant?: "default" | "home" | "gallery";
   /** Override cover (used by project detail gallery slides). */
   image?: string;
+  /** Preview then full — does not delay the curtain cover. */
+  progressive?: boolean;
 }
 
 export function ProjectCard({
@@ -16,6 +23,7 @@ export function ProjectCard({
   className,
   variant = "default",
   image,
+  progressive = false,
 }: ProjectCardProps) {
   const isHome = variant === "home";
   const isGallery = variant === "gallery";
@@ -30,17 +38,32 @@ export function ProjectCard({
         isHome ? "aspect-[4/5]" : "aspect-square",
       )}
     >
-      <Image
-        src={src}
-        alt={project.title}
-        fill
-        className={cn(
-          "object-contain object-center",
-          isGallery && "transition-transform duration-300 group-hover:scale-[1.02]",
-          isHome ? "p-4 md:p-6" : isGallery ? "p-4" : "p-7",
-        )}
-        sizes="(max-width: 768px) 50vw, 25vw"
-      />
+      {progressive ? (
+        <ProgressiveImage
+          src={src}
+          alt={project.title}
+          previewWidth={HOME_CARD_PREVIEW_WIDTH}
+          fullWidth={HOME_CARD_FULL_WIDTH}
+          className={cn(
+            "object-contain object-center",
+            isGallery && "transition-transform duration-300 group-hover:scale-[1.02]",
+            isHome ? "p-4 md:p-6" : isGallery ? "p-4" : "p-7",
+          )}
+          sizes="(max-width: 768px) 50vw, 25vw"
+        />
+      ) : (
+        <Image
+          src={src}
+          alt={project.title}
+          fill
+          className={cn(
+            "object-contain object-center",
+            isGallery && "transition-transform duration-300 group-hover:scale-[1.02]",
+            isHome ? "p-4 md:p-6" : isGallery ? "p-4" : "p-7",
+          )}
+          sizes="(max-width: 768px) 50vw, 25vw"
+        />
+      )}
     </div>
   );
 

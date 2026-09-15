@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { SiteImage } from "@/components/site/site-image";
+import { ProgressiveImage } from "@/components/site/progressive-image";
+import {
+  CANVAS_FULL_WIDTH,
+  CANVAS_PREVIEW_WIDTH,
+} from "@/lib/optimized-image-src";
 import { Button } from "@/components/ui/button";
 
 const SWIPE_MIN_PX = 48;
@@ -107,12 +111,12 @@ export function ProjectDetailLightbox({
           touchStartX.current = null;
         }}
       >
-        <SiteImage
+        <ProgressiveImage
           key={`${src}-${current}`}
           src={src}
           alt={`${title} — ${current + 1}`}
-          fill
-          blur={false}
+          previewWidth={CANVAS_PREVIEW_WIDTH}
+          fullWidth={CANVAS_FULL_WIDTH}
           sizes="100vw"
           className="object-contain"
         />

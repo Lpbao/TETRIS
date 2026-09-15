@@ -4,8 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ProjectDetailLightbox } from "@/components/site/project-detail-lightbox";
-import { SiteImage } from "@/components/site/site-image";
+import { ProgressiveImage } from "@/components/site/progressive-image";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import {
+  HOME_CARD_FULL_WIDTH,
+  HOME_CARD_PREVIEW_WIDTH,
+} from "@/lib/optimized-image-src";
 import { cn } from "@/lib/utils";
 
 interface ProjectDetailImagesProps {
@@ -200,15 +204,15 @@ export function ProjectDetailImages({
             >
               <div data-detail-fx className="project-detail-grid__fx">
                 <div data-detail-img className="project-detail-grid__img">
-                  <SiteImage
+                  <ProgressiveImage
                     src={src}
                     alt={`${title} — ${index + 1}`}
-                    fill
-                    blur={false}
+                    previewWidth={HOME_CARD_PREVIEW_WIDTH}
+                    fullWidth={HOME_CARD_FULL_WIDTH}
+                    fade={false}
                     loading={index < 8 ? "eager" : "lazy"}
                     sizes="(max-width: 1023px) 45vw, 180px"
-                    popOnHover
-                    className="object-cover"
+                    className="site-image--pop-hover object-cover"
                   />
                 </div>
               </div>

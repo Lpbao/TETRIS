@@ -68,7 +68,7 @@ export function FullPageScrollPanel({
         data-fps-inner-scroll={isScrollable ? "" : undefined}
         className={cn(
           "h-full min-h-0",
-          isScrollable && "overflow-y-auto overscroll-y-contain",
+          isScrollable && "relative overflow-y-auto overscroll-y-contain",
           !isScrollable && "overflow-hidden",
         )}
         style={{

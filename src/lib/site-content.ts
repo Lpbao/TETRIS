@@ -147,6 +147,11 @@ export interface HeroSlide {
 }
 
 /** Public project — map Prisma `Post` (coverImage, images, concept, address). */
+export type SiteProjectLayoutStyle =
+  | "LAYOUTDEFAULT"
+  | "LAYOUT1"
+  | "LAYOUT2";
+
 export interface SiteProject {
   slug: string;
   title: string;
@@ -164,6 +169,8 @@ export interface SiteProject {
   images?: string[];
   /** @deprecated — dùng `images` */
   gallery?: string[];
+  /** Gallery layout — map `Post.layoutStyle`; thiếu → LAYOUT1 */
+  layoutStyle?: SiteProjectLayoutStyle;
 }
 
 const COCKTAIL_PAIRING_DIR = "/site/projects/cocktail-pairing";

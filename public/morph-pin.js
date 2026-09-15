@@ -105,10 +105,19 @@
       var vvh = scroller.clientHeight;
       if (vvh <= 0) return;
 
-      var letterRatio = Math.max(
+      var cssLetterRatio = Math.max(
         0,
         readNum(root, "--morph-pin-letter-ratio", 0),
       );
+      var letterRatio = cssLetterRatio;
+      if (cssLetterRatio > 0 && root.hasAttribute("data-brand-break")) {
+        var targetPx = readNum(root, "--brand-break-letter-px", 200);
+        var minR = readNum(root, "--brand-break-letter-ratio-min", 0.16);
+        var maxR = readNum(root, "--brand-break-letter-ratio-max", 0.28);
+        letterRatio = targetPx / vvh;
+        if (letterRatio < minR) letterRatio = minR;
+        if (letterRatio > maxR) letterRatio = maxR;
+      }
       var imageRatio = positive(readNum(root, "--morph-pin-image-ratio", 1), 1);
       var shrinkSpeed = positive(
         readNum(root, "--morph-pin-shrink-speed", 1.2),
@@ -177,6 +186,36 @@
       setVar(root, "--morph-pin-p-shrink", String(pShrink));
       setVar(root, "--morph-pin-p-top", String(pTop));
       setVar(root, "--morph-pin-content-shift", contentShift + "px");
+      /* Soft-stagger letter exit — finish=1, stagger theo token */
+      if (letterRatio > 0) {
+        var vw =
+          (window.visualViewport && window.visualViewport.width) ||
+          window.innerWidth;
+        var exitStagger = readNum(root, "--brand-break-exit-stagger", 0.1);
+        if (exitStagger > 0.3) exitStagger = 0.3;
+        if (exitStagger < 0) exitStagger = 0;
+        var exitFinish = readNum(root, "--brand-break-exit-finish", 1);
+        if (exitFinish > 1) exitFinish = 1;
+        if (exitFinish < exitStagger * 2 + 0.05) {
+          exitFinish = exitStagger * 2 + 0.05;
+        }
+        var span = exitFinish - 2 * exitStagger;
+        if (span < 0.01) span = 0.01;
+        function exitPx(p) {
+          return (Math.round(-p * vw * 10) / 10).toFixed(1) + "px";
+        }
+        setVar(root, "--morph-pin-letter-x", exitPx(pLetter));
+        var ids = ["top", "mid", "bot"];
+        for (var i = 0; i < ids.length; i++) {
+          var p = Math.min(
+            1,
+            Math.max(0, (pLetter - i * exitStagger) / span),
+          );
+          setVar(root, "--morph-pin-letter-x-" + ids[i], exitPx(p));
+        }
+      } else {
+        setVar(root, "--morph-pin-letter-x", "0px");
+      }
 
       snapBrandBreakLogoRest(root);
     }

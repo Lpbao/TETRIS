@@ -116,6 +116,7 @@ async function seedPosts(categoryIds: Map<string, string>) {
       description,
       coverImage: project.heroImage ?? project.illustration,
       images: project.images ?? project.gallery ?? [],
+      layoutStyle: project.layoutStyle ?? "LAYOUT1",
       published: true,
     });
 
@@ -129,6 +130,7 @@ async function seedPosts(categoryIds: Map<string, string>) {
         description: parsed.description,
         coverImage: parsed.coverImage || null,
         images: parsed.images,
+        layoutStyle: parsed.layoutStyle,
         published: parsed.published,
         content: description || null,
         excerpt: description.slice(0, 500) || null,

@@ -1,7 +1,7 @@
 const PROJECT_ENTER_DELAY_FALLBACK_MS = 100;
 const PROJECT_COVER_FADE_FALLBACK_MS = 600;
 /** iOS: overlay/autodismiss có thể không về opacity đúng 0 — không chờ vô hạn. */
-export const PROJECT_ENTER_FAILSAFE_MS = 4000;
+export const PROJECT_ENTER_FAILSAFE_MS = 10000;
 
 function readCssTimeMs(
   node: Element | null,

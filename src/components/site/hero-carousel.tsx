@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { CarouselDots } from "@/components/site/carousel-dots";
-import { SiteImage } from "@/components/site/site-image";
+import { ProgressiveImage } from "@/components/site/progressive-image";
+import {
+  CANVAS_FULL_WIDTH,
+  CANVAS_PREVIEW_WIDTH,
+} from "@/lib/optimized-image-src";
 import {
   isHeroGestureActive,
   scrollToProjectsAnchor,
@@ -341,19 +345,27 @@ export function HeroCarousel({
       onPointerLeave={() => setIsHovered(false)}
     >
       <div ref={trackRef} data-hero-track>
-        {slides.map((item, index) => (
-          <div key={`${item.image}-${index}`} data-hero-slide aria-hidden={index !== activeIndex}>
-            <SiteImage
-              src={item.image}
-              alt={item.title}
-              fill
-              priority={index === 0}
-              draggable={false}
-              className="pointer-events-none object-cover"
-              sizes="100vw"
-            />
-          </div>
-        ))}
+        {slides.map((item, index) => {
+          const distance = Math.min(
+            Math.abs(index - activeIndex),
+            slides.length - Math.abs(index - activeIndex),
+          );
+
+          return (
+            <div key={`${item.image}-${index}`} data-hero-slide aria-hidden={index !== activeIndex}>
+              <ProgressiveImage
+                src={item.image}
+                alt={item.title}
+                previewWidth={CANVAS_PREVIEW_WIDTH}
+                fullWidth={CANVAS_FULL_WIDTH}
+                loadPreview={distance <= 1}
+                loadFull={index === activeIndex}
+                priority={index === 0}
+                className="pointer-events-none object-cover"
+              />
+            </div>
+          );
+        })}
       </div>
 
       {slides.length > 1 ? (

@@ -197,7 +197,12 @@ export function HomeProjectCurtainCard({
       className={cn("relative", hoverScale && "project-card-hover-scale")}
     >
       <div className="relative">
-        <ProjectCard project={project} variant={variant} image={image} />
+        <ProjectCard
+          project={project}
+          variant={variant}
+          image={image}
+          progressive
+        />
         {playCover ? (
           <div
             aria-hidden

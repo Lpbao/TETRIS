@@ -1,6 +1,10 @@
 "use client";
 
-import { SiteImage } from "@/components/site/site-image";
+import { ProgressiveImage } from "@/components/site/progressive-image";
+import {
+  CANVAS_FULL_WIDTH,
+  CANVAS_PREVIEW_WIDTH,
+} from "@/lib/optimized-image-src";
 import { cn } from "@/lib/utils";
 
 interface AboutHeroProps {
@@ -18,14 +22,13 @@ export function AboutHero({ src, alt, className }: AboutHeroProps) {
         className,
       )}
     >
-      <SiteImage
+      <ProgressiveImage
         src={src}
         alt={alt}
-        fill
+        previewWidth={CANVAS_PREVIEW_WIDTH}
+        fullWidth={CANVAS_FULL_WIDTH}
         priority
-        grayscale
-        blur={false}
-        className="object-contain p-4 md:p-8"
+        className="object-contain p-4 grayscale md:p-8"
         sizes="100vw"
       />
     </div>

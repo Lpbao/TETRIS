@@ -12,6 +12,15 @@ const optionalSlugSchema = z
     "Slug chỉ được chứa chữ thường, số và dấu gạch ngang",
   );
 
+/** Khớp Prisma `PostLayoutStyle`. LAYOUT2 = Infinite Canvas (R3F). */
+export const postLayoutStyleSchema = z.enum([
+  "LAYOUTDEFAULT",
+  "LAYOUT1",
+  "LAYOUT2",
+]);
+
+export type PostLayoutStyle = z.infer<typeof postLayoutStyleSchema>;
+
 export const postSchema = z.object({
   title: z
     .string()
@@ -31,6 +40,7 @@ export const postSchema = z.object({
   coverImage: optionalMediaPathSchema,
   /** Không dùng `.default([])` — lệch input/output làm `zodResolver` + RHF lỗi type. */
   images: z.array(mediaPathSchema),
+  layoutStyle: postLayoutStyleSchema,
   published: z.boolean(),
 });
 

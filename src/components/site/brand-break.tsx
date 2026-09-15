@@ -1,5 +1,9 @@
 import { LogoComponent } from "@/components/site/logo-component";
-import { SiteImage } from "@/components/site/site-image";
+import { ProgressiveImage } from "@/components/site/progressive-image";
+import {
+  CANVAS_FULL_WIDTH,
+  CANVAS_PREVIEW_WIDTH,
+} from "@/lib/optimized-image-src";
 import { cn } from "@/lib/utils";
 
 interface BrandBreakImageProps {
@@ -22,13 +26,12 @@ export function BrandBreakImage({
         className,
       )}
     >
-      <SiteImage
+      <ProgressiveImage
         src={image}
         alt={imageAlt}
-        fill
-        grayscale
-        blur={false}
-        className="object-contain p-4 md:p-8"
+        previewWidth={CANVAS_PREVIEW_WIDTH}
+        fullWidth={CANVAS_FULL_WIDTH}
+        className="object-contain p-4 grayscale md:p-8"
         sizes="100vw"
       />
     </div>

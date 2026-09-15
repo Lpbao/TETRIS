@@ -17,7 +17,7 @@ export function ProjectsPageScroll({
 }: ProjectsPageScrollProps) {
   return (
     <>
-      <ProjectShowcase projects={projects} showPagination />
+      <ProjectShowcase projects={projects} infinite />
       <SiteFooter className="mt-[var(--projects-footer-gap)]" contact={contact} />
     </>
   );

@@ -48,6 +48,7 @@ export function PostForm({ initialData, categories, mode }: PostFormProps) {
       description: "",
       coverImage: "",
       images: [],
+      layoutStyle: "LAYOUTDEFAULT",
       published: false,
     },
   });
@@ -55,6 +56,7 @@ export function PostForm({ initialData, categories, mode }: PostFormProps) {
   const title = watch("title");
   const coverImage = watch("coverImage");
   const images = watch("images");
+  const layoutStyle = watch("layoutStyle");
 
   const onSubmit = async (data: PostFormValues) => {
     setIsSubmitting(true);
@@ -183,6 +185,27 @@ export function PostForm({ initialData, categories, mode }: PostFormProps) {
         }
       />
       <FieldError message={errors.images?.message} />
+
+      <div className="space-y-2">
+        <Label htmlFor="layoutStyle">Layout trang chi tiết</Label>
+        <select
+          id="layoutStyle"
+          className={cn(selectClassName)}
+          value={layoutStyle}
+          onChange={(event) =>
+            setValue(
+              "layoutStyle",
+              event.target.value as PostFormValues["layoutStyle"],
+              { shouldValidate: true },
+            )
+          }
+        >
+          <option value="LAYOUTDEFAULT">Giao diện mặc định</option>
+          <option value="LAYOUT1">Giao diện animation gallery</option>
+          <option value="LAYOUT2">Giao diện 3D gallery</option>
+        </select>
+        <FieldError message={errors.layoutStyle?.message} />
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="description">Mô tả</Label>

@@ -50,6 +50,7 @@ export default async function EditPostPage({ params }: EditPostPageProps) {
               description: post.description,
               coverImage: post.coverImage ?? "",
               images: post.images,
+              layoutStyle: post.layoutStyle,
               published: post.published,
             }}
           />
