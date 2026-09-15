@@ -57,6 +57,16 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ["sharp"],
+  // sharp 0.35+: NFT/Turbopack traces .node nhưng bỏ sót libvips-cpp.so →
+  // ERR_DLOPEN_FAILED trên Vercel linux-x64 khi POST /api/media.
+  outputFileTracingIncludes: {
+    "/api/media": [
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
+      "./node_modules/@img/sharp-linuxmusl-x64/**/*",
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",

@@ -1,5 +1,3 @@
-import sharp from "sharp";
-
 /** Cạnh dài tối đa — đủ hero/slider, cắt ảnh điện thoại 4–6k. */
 export const MEDIA_IMAGE_MAX_EDGE = 2560;
 
@@ -20,6 +18,23 @@ export type OptimizedUpload = {
   optimized: boolean;
 };
 
+type SharpFn = (typeof import("sharp"))["default"];
+
+let sharpModulePromise: Promise<SharpFn | null> | null = null;
+
+/** Lazy-load sharp — tránh crash khi native/libvips thiếu trên serverless. */
+function loadSharp(): Promise<SharpFn | null> {
+  if (!sharpModulePromise) {
+    sharpModulePromise = import("sharp")
+      .then((mod) => mod.default)
+      .catch((err) => {
+        console.error("[optimize-image] sharp unavailable, skipping optimize:", err);
+        return null;
+      });
+  }
+  return sharpModulePromise;
+}
+
 function withWebpExtension(filename: string) {
   const trimmed = filename.trim() || "image";
   const base = trimmed.includes(".")
@@ -32,6 +47,7 @@ function withWebpExtension(filename: string) {
  * Nén ảnh raster lúc upload: xoay theo EXIF, fit trong 2560px, WebP q82.
  * Bỏ qua SVG, video, GIF/WebP động. Nếu file nén không nhỏ hơn bản gốc
  * (và không cần resize) thì giữ nguyên.
+ * Sharp/libvips lỗi load → passthrough (upload vẫn thành công).
  */
 export async function optimizeImageForUpload(
   buffer: Buffer,
@@ -46,6 +62,11 @@ export async function optimizeImageForUpload(
   };
 
   if (!RASTER_MIME.has(mimeType)) {
+    return passthrough;
+  }
+
+  const sharp = await loadSharp();
+  if (!sharp) {
     return passthrough;
   }
 
