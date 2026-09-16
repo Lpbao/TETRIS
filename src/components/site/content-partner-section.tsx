@@ -111,7 +111,7 @@ export function ContentPartnerSection({
       data-content-partner-animate={visible ? "in" : "out"}
       className={cn("relative w-full bg-background", className)}
     >
-      <div className="mx-auto flex w-full max-w-4xl flex-col justify-start px-4 pt-6 pb-0 md:pt-8 md:pb-0">
+      <div className="mx-auto flex w-full max-w-4xl flex-col justify-start px-[var(--site-header-pad-inline)] pt-6 pb-0 md:pt-8 md:pb-0">
         <ContentSection
           title={journeyTitle}
           paragraphs={journeyParagraphs}

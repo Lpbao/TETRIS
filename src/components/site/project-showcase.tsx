@@ -89,6 +89,15 @@ export function ProjectShowcase({
         </div>
       ) : null}
 
+      {isHome ? (
+        <h2
+          data-home-projects-heading
+          className="hidden shrink-0 md:block"
+        >
+          Dự án gần đây
+        </h2>
+      ) : null}
+
       <div
         className={cn(
           "mx-auto w-full",

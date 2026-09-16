@@ -18,7 +18,7 @@ export default async function ContactPage() {
     <div data-contact-page>
       <ContactMap
         address={contact.address}
-        className="mt-[36px] px-[28px]"
+        className="mt-[36px] px-[28px] md:mx-auto md:w-full md:max-w-[700px] md:px-0"
       />
       <ContactInfo contact={contact} />
       <SiteFooter contact={contact} />

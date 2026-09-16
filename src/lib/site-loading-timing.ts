@@ -16,7 +16,7 @@ export function readSiteLoadingDismissMs(node: Element | null): number {
   const raw =
     styles.getPropertyValue("--sl-dismiss-ms").trim() ||
     styles.getPropertyValue("--sl-autodismiss-ms").trim() ||
-    "7s";
+    "0.5s";
   const ms = cssTimeToMs(raw);
   return Number.isFinite(ms) && ms > 0 ? ms : DISMISS_FALLBACK_MS;
 }

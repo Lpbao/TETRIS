@@ -25,7 +25,7 @@ interface SiteLoadingContextValue {
   /**
    * Loading trước → paint → rồi `router.push`.
    * Ẩn khi URL đích khớp và `main` không còn `[data-site-loading]` (Suspense / loading.tsx xong),
-   * rồi chờ `--sl-dismiss-ms` (7s) trước khi unmount overlay.
+   * rồi chờ `--sl-dismiss-ms` (0.5s) trước khi unmount overlay.
    */
   navigateWithLoading: (
     href: string,

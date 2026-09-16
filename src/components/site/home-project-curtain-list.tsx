@@ -130,7 +130,8 @@ export function HomeProjectCurtainList({
       ref={listRef}
       data-project-cover=""
       className={cn(
-        "grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-10 lg:grid-cols-4",
+        "grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-10",
+        cardVariant === "gallery" && "lg:grid-cols-4",
         className,
       )}
     >

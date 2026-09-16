@@ -22,6 +22,11 @@ type ProgressiveImageProps = {
   loadPreview?: boolean;
   /** Fetch the sharp image after the preview is visible. */
   loadFull?: boolean;
+  /**
+   * After the sharp layer has loaded once, keep it mounted/visible even when
+   * `loadFull` turns off — avoids soft→sharp flash on revisit (hero slider).
+   */
+  persistFull?: boolean;
   /** High priority on the preview request (LCP). */
   priority?: boolean;
   /** Crossfade the sharp layer. Off when a parent already animates opacity. */
@@ -33,6 +38,10 @@ type ProgressiveImageProps = {
   sizes?: string;
 };
 
+function isImgDecoded(img: HTMLImageElement | null) {
+  return Boolean(img?.complete && img.naturalWidth > 0);
+}
+
 export function ProgressiveImage({
   src,
   alt,
@@ -42,6 +51,7 @@ export function ProgressiveImage({
   fullQuality = CANVAS_FULL_QUALITY,
   loadPreview = true,
   loadFull = true,
+  persistFull = false,
   priority = false,
   fade = true,
   layout = "fill",
@@ -57,6 +67,8 @@ export function ProgressiveImage({
   const [fullSrc, setFullSrc] = useState(fullTarget);
   const [previewReady, setPreviewReady] = useState(false);
   const [fullReady, setFullReady] = useState(false);
+  const previewRef = useRef<HTMLImageElement>(null);
+  const fullRef = useRef<HTMLImageElement>(null);
   const targetKey = `${previewTarget}\0${fullTarget}`;
   const targetKeyRef = useRef(targetKey);
 
@@ -69,11 +81,24 @@ export function ProgressiveImage({
     setFullReady(false);
   }, [fullTarget, previewTarget, targetKey]);
 
-  const showFull = loadFull && previewReady && previewSrc !== fullSrc;
+  const wantFull =
+    loadFull || (persistFull && fullReady);
+  const showFull = wantFull && previewReady && previewSrc !== fullSrc;
 
   useEffect(() => {
-    if (!showFull) setFullReady(false);
-  }, [showFull]);
+    if (!showFull && !persistFull) setFullReady(false);
+  }, [showFull, persistFull]);
+
+  /* Cache/LCP: onLoad có thể không chạy nếu img đã complete trước khi gắn handler. */
+  useEffect(() => {
+    if (!loadPreview || previewReady) return;
+    if (isImgDecoded(previewRef.current)) setPreviewReady(true);
+  }, [loadPreview, previewReady, previewSrc]);
+
+  useEffect(() => {
+    if (!showFull || fullReady) return;
+    if (isImgDecoded(fullRef.current)) setFullReady(true);
+  }, [showFull, fullReady, fullSrc]);
 
   if (!original || isSvgSrc(original)) {
     if (!original) return null;
@@ -110,6 +135,7 @@ export function ProgressiveImage({
 
   const preview = loadPreview ? (
         <img
+          ref={previewRef}
           src={previewSrc}
           alt={fullReady ? "" : alt}
           aria-hidden={fullReady || undefined}
@@ -126,6 +152,7 @@ export function ProgressiveImage({
   ) : null;
   const full = showFull ? (
         <img
+          ref={fullRef}
           src={fullSrc}
           data-progressive-full=""
           alt={fullReady ? alt : ""}

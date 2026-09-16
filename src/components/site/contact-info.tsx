@@ -12,8 +12,8 @@ export function ContactInfo({ contact, className }: ContactInfoProps) {
   return (
     <section className={cn("contact-info", className)}>
       <div className="contact-info-list">
-        <p>
-          <span className="contact-info-label">Email: </span>
+        <p className="contact-info-item">
+          <span className="contact-info-label">Email:</span>{" "}
           <a
             href={`mailto:${contact.email}`}
             className="contact-info-value"
@@ -21,14 +21,14 @@ export function ContactInfo({ contact, className }: ContactInfoProps) {
             {contact.email}
           </a>
         </p>
-        <p>
-          <span className="contact-info-label">Số điện thoại: </span>
+        <p className="contact-info-item">
+          <span className="contact-info-label">Số điện thoại:</span>{" "}
           <a href={`tel:${phoneHref}`} className="contact-info-value">
             {contact.phone}
           </a>
         </p>
-        <p>
-          <span className="contact-info-label">Địa chỉ: </span>
+        <p className="contact-info-item">
+          <span className="contact-info-label">Địa chỉ:</span>{" "}
           <span className="contact-info-value">{contact.address}</span>
         </p>
       </div>

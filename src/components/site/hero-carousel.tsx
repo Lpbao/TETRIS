@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { CarouselDots } from "@/components/site/carousel-dots";
 import { ProgressiveImage } from "@/components/site/progressive-image";
+import { useSiteLoading } from "@/components/site/site-loading-context";
 import {
   CANVAS_FULL_WIDTH,
   CANVAS_PREVIEW_WIDTH,
@@ -24,15 +25,8 @@ interface HeroCarouselProps {
 }
 
 const WHEEL_COOLDOWN_MS = 420;
-const DOT_SETTLE_FALLBACK_MS = 500;
-
-function readDotSettleMs(root: HTMLElement | null) {
-  if (!root) return DOT_SETTLE_FALLBACK_MS;
-  const raw = getComputedStyle(root).getPropertyValue("--carousel-dot-settle-ms").trim();
-  if (raw.endsWith("ms")) return Number.parseFloat(raw) || DOT_SETTLE_FALLBACK_MS;
-  if (raw.endsWith("s")) return Number.parseFloat(raw) * 1000 || DOT_SETTLE_FALLBACK_MS;
-  return Number.parseFloat(raw) || DOT_SETTLE_FALLBACK_MS;
-}
+/** Debounce ngắn khi browser chưa có scrollend — tránh flicker giữa 2 slide. */
+const SCROLL_INDEX_DEBOUNCE_MS = 50;
 
 type Point = { x: number; y: number };
 
@@ -56,6 +50,7 @@ export function HeroCarousel({
   className,
   projectsAnchorId = "home-projects",
 }: HeroCarouselProps) {
+  const { navigateWithLoading } = useSiteLoading();
   const sectionRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const originRef = useRef<Point | null>(null);
@@ -67,9 +62,8 @@ export function HeroCarousel({
   const activeIndexRef = useRef(0);
   const jumpingRef = useRef(false);
   const jumpTimerRef = useRef(0);
-  const dotSettleTimerRef = useRef(0);
+  const scrollIndexTimerRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [dotIndex, setDotIndex] = useState(0);
   const [isHeroActive, setIsHeroActive] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
   activeIndexRef.current = activeIndex;
@@ -92,7 +86,7 @@ export function HeroCarousel({
       jumpingRef.current = true;
       track.dataset.heroJumping = "";
       window.clearTimeout(jumpTimerRef.current);
-      window.clearTimeout(dotSettleTimerRef.current);
+      window.clearTimeout(scrollIndexTimerRef.current);
       const left = slide.offsetLeft;
       track.scrollLeft = left;
       requestAnimationFrame(() => {
@@ -100,10 +94,6 @@ export function HeroCarousel({
         jumpTimerRef.current = window.setTimeout(() => {
           jumpingRef.current = false;
           delete track.dataset.heroJumping;
-          window.clearTimeout(dotSettleTimerRef.current);
-          dotSettleTimerRef.current = window.setTimeout(() => {
-            setDotIndex(next);
-          }, readDotSettleMs(sectionRef.current));
         }, 80);
       });
     },
@@ -153,7 +143,7 @@ export function HeroCarousel({
     const track = trackRef.current;
     if (!track) return;
 
-    const commitDotFromSlide = () => {
+    const commitIndexFromScroll = () => {
       if (jumpingRef.current) return;
       const width = track.clientWidth;
       if (width <= 0) return;
@@ -162,24 +152,28 @@ export function HeroCarousel({
         Math.max(0, Math.round(track.scrollLeft / width)),
       );
       setActiveIndex(index);
-      setDotIndex(index);
     };
 
-    const scheduleDotCommit = () => {
+    const onScroll = () => {
       if (jumpingRef.current) return;
-      window.clearTimeout(dotSettleTimerRef.current);
-      dotSettleTimerRef.current = window.setTimeout(
-        commitDotFromSlide,
-        readDotSettleMs(sectionRef.current),
+      window.clearTimeout(scrollIndexTimerRef.current);
+      scrollIndexTimerRef.current = window.setTimeout(
+        commitIndexFromScroll,
+        SCROLL_INDEX_DEBOUNCE_MS,
       );
     };
 
-    track.addEventListener("scroll", scheduleDotCommit, { passive: true });
-    track.addEventListener("scrollend", scheduleDotCommit);
+    const onScrollEnd = () => {
+      window.clearTimeout(scrollIndexTimerRef.current);
+      commitIndexFromScroll();
+    };
+
+    track.addEventListener("scroll", onScroll, { passive: true });
+    track.addEventListener("scrollend", onScrollEnd);
     return () => {
-      window.clearTimeout(dotSettleTimerRef.current);
-      track.removeEventListener("scroll", scheduleDotCommit);
-      track.removeEventListener("scrollend", scheduleDotCommit);
+      window.clearTimeout(scrollIndexTimerRef.current);
+      track.removeEventListener("scroll", onScroll);
+      track.removeEventListener("scrollend", onScrollEnd);
     };
   }, [slides.length]);
 
@@ -328,6 +322,8 @@ export function HeroCarousel({
 
   if (slides.length === 0) return null;
 
+  const activeSlide = slides[activeIndex] ?? slides[0]!;
+
   return (
     <section
       ref={sectionRef}
@@ -359,7 +355,8 @@ export function HeroCarousel({
                 previewWidth={CANVAS_PREVIEW_WIDTH}
                 fullWidth={CANVAS_FULL_WIDTH}
                 loadPreview={distance <= 1}
-                loadFull={index === activeIndex}
+                loadFull={distance <= 1}
+                persistFull
                 priority={index === 0}
                 className="pointer-events-none object-cover"
               />
@@ -368,29 +365,46 @@ export function HeroCarousel({
         })}
       </div>
 
-      {slides.length > 1 ? (
-        <>
-          <button
-            type="button"
-            aria-label="Slide trước"
-            className="absolute top-1/2 left-3 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center text-white md:flex"
-            onClick={() => goTo(activeIndex - 1)}
-          >
-            <ChevronLeft className="size-8" strokeWidth={1.25} />
-          </button>
-          <button
-            type="button"
-            aria-label="Slide tiếp"
-            className="absolute top-1/2 right-3 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center text-white md:flex"
-            onClick={() => goTo(activeIndex + 1)}
-          >
-            <ChevronRight className="size-8" strokeWidth={1.25} />
-          </button>
-        </>
-      ) : null}
+      <div data-hero-caption data-hero-pager className="absolute inset-x-0 bottom-0 z-20 px-4 md:px-8">
+        {/* Mobile — dots centered only */}
+        <div className="md:hidden">
+          <CarouselDots
+            count={slides.length}
+            activeIndex={activeIndex}
+            onSelect={goTo}
+          />
+        </div>
 
-      <div data-hero-caption data-hero-pager className="absolute inset-x-0 bottom-0 z-20 px-4">
-        <CarouselDots count={slides.length} activeIndex={dotIndex} onSelect={goTo} />
+        {/* Desktop — title | dots | CTA */}
+        <div className="relative hidden items-center md:flex">
+          <div className="z-10 flex min-w-0 flex-1 items-baseline gap-8 pr-8 text-sm font-medium tracking-[0.2em] text-white uppercase">
+            <span className="truncate">{activeSlide.title}</span>
+            <span className="truncate opacity-90">{activeSlide.location}</span>
+          </div>
+
+          <div className="pointer-events-none absolute inset-x-0 flex justify-center">
+            <div className="pointer-events-auto">
+              <CarouselDots
+                count={slides.length}
+                activeIndex={activeIndex}
+                onSelect={goTo}
+              />
+            </div>
+          </div>
+
+          <div className="z-10 flex flex-1 justify-end pl-8">
+            <Link
+              href={activeSlide.href}
+              onClick={(event) => {
+                event.preventDefault();
+                navigateWithLoading(activeSlide.href);
+              }}
+              className="cursor-pointer rounded-full bg-white px-6 py-2.5 text-xs font-medium tracking-[0.2em] text-[#231f20] uppercase transition-colors duration-200 ease-out hover:bg-brand-red hover:text-white"
+            >
+              XEM DỰ ÁN
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );

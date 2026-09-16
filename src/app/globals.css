@@ -183,6 +183,40 @@ a.contact-info-value:hover {
   color: var(--brand-red);
 }
 
+@media (min-width: 768px) {
+  .contact-info-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 2rem;
+    max-width: 700px;
+    margin-top: 0;
+  }
+
+  .contact-info-list > * + * {
+    margin-top: 0;
+  }
+
+  .contact-info-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: center;
+  }
+
+  .contact-info-label {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .contact-info-value {
+    color: var(--muted-foreground);
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+}
+
 /*
  * /contact — đẩy footer sát đáy viewport (svh: tránh pad footer dưới fold trên iOS).
  * Khoảng trống nằm giữa contact-info và footer (`margin-top: auto`).
@@ -229,7 +263,7 @@ a.contact-info-value:hover {
   display: flex;
   align-items: center;
   width: 100%;
-  max-width: 72rem;
+  /* max-width: 72rem; */
   margin-inline: auto;
   padding: var(--site-header-pad-top) var(--site-header-pad-inline)
     var(--site-header-pad-bottom);
@@ -1014,7 +1048,7 @@ html:has([data-full-page-scroll-active]) main {
 }
 
 [data-about-hero-morph] {
-  --morph-pin-title-gap: 12px;
+  --morph-pin-title-gap: 48px;
   --morph-pin-align-speed: 2;
 }
 
@@ -1200,7 +1234,6 @@ html:has(#hero-carousel) body {
 }
 
 #hero-carousel {
-  --carousel-dot-settle-ms: 500ms;
   position: relative;
   z-index: 0;
   isolation: isolate;
@@ -1279,10 +1312,12 @@ html:has(#hero-carousel) body {
   --home-projects-pad-bottom: 0px;
   --home-projects-pad-inline: 30px;
   --home-projects-list-mt: 0px;
+  --home-projects-title-block-h: 0px;
   --home-projects-media-h: calc(
     (
         100lvh - var(--site-header-total-height) - var(--home-projects-pad-top) -
           var(--home-projects-pad-bottom) - var(--home-projects-list-mt) -
+          var(--home-projects-title-block-h) -
           (var(--home-projects-visible-rows) - 1) * var(--home-projects-gap-y) -
           var(--home-projects-visible-rows) * var(--home-projects-caption-h)
       ) / var(--home-projects-visible-rows)
@@ -1317,6 +1352,13 @@ html:has(#hero-carousel) body {
   height: var(--home-projects-media-h);
 }
 
+@media (min-width: 768px) {
+  #home-projects [data-project-cover] [data-project-card-media] {
+    height: max(200px, var(--home-projects-media-h));
+    min-height: 200px;
+  }
+}
+
 #home-projects [data-project-cover] [data-section-title],
 #home-projects [data-project-cover] h3 {
   margin-top: 0.35rem;
@@ -1337,6 +1379,31 @@ html:has(#hero-carousel) body {
     --home-projects-gap-x: 1rem;
     --home-projects-gap-y: 1.25rem;
     --home-projects-caption-h: 3rem;
+    --home-projects-pad-top: 78px;
+    --home-projects-heading-h: 1.25rem;
+    --home-projects-heading-gap: 48px;
+    --home-projects-list-mb: 100px;
+    --home-projects-title-block-h: calc(
+      var(--home-projects-heading-h) + var(--home-projects-heading-gap)
+    );
+  }
+
+  #home-projects [data-project-cover] {
+    margin-bottom: var(--home-projects-list-mb);
+  }
+
+  #home-projects [data-home-projects-heading] {
+    width: 100vw;
+    max-width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    margin-bottom: var(--home-projects-heading-gap);
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: var(--home-projects-heading-h);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--foreground);
   }
 
   #home-projects [data-project-cover] h3 {
@@ -1356,7 +1423,6 @@ html:has(#hero-carousel) body {
 [data-carousel-dots] {
   --carousel-dot-size: 8px;
   --carousel-dot-gap: 8px;
-  --carousel-dot-settle-ms: 500ms;
   gap: var(--carousel-dot-gap);
 }
 
@@ -2357,7 +2423,7 @@ html[data-lightbox-open] .site-header {
   --sl-hold-ms: 0.5s;
   --sl-exit-ms: 0.2s;
   --sl-loop-ms: 1.7s;
-  --sl-dismiss-ms: 7s;
+  --sl-dismiss-ms: 0.5s;
   --sl-autodismiss-ms: var(--sl-dismiss-ms);
   --sl-ease: cubic-bezier(0.22, 1, 0.36, 1);
   position: fixed;

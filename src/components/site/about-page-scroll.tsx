@@ -27,7 +27,7 @@ export function AboutPageScroll({ content, contact }: AboutPageScrollProps) {
       "aria-label": "Ảnh đội ngũ, giới thiệu và giải thưởng",
       children: (
         <AboutHeroSection src={content.heroImage} alt="Đội ngũ Tetris Design">
-          <div className="mx-auto max-w-3xl px-4">
+          <div className="mx-auto max-w-3xl px-[var(--site-header-pad-inline)]">
             <ContentSection
               title={content.introduction.title}
               paragraphs={content.introduction.paragraphs}
