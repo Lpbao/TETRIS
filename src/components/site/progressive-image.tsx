@@ -18,6 +18,11 @@ type ProgressiveImageProps = {
   fullWidth: number;
   previewQuality?: number;
   fullQuality?: number;
+  /**
+   * Full layer uses the storage URL as-is (no `/_next/image` re-encode).
+   * Hero slider: sharpest match to uploaded asset after preview paints.
+   */
+  fullUseOriginal?: boolean;
   /** Fetch the small image. Offscreen slides stay unloaded. */
   loadPreview?: boolean;
   /** Fetch the sharp image after the preview is visible. */
@@ -49,6 +54,7 @@ export function ProgressiveImage({
   fullWidth,
   previewQuality = CANVAS_PREVIEW_QUALITY,
   fullQuality = CANVAS_FULL_QUALITY,
+  fullUseOriginal = false,
   loadPreview = true,
   loadFull = true,
   persistFull = false,
@@ -62,7 +68,9 @@ export function ProgressiveImage({
   const reduced = usePrefersReducedMotion();
   const original = src.trim();
   const previewTarget = optimizedImageSrc(original, previewWidth, previewQuality);
-  const fullTarget = optimizedImageSrc(original, fullWidth, fullQuality);
+  const fullTarget = fullUseOriginal
+    ? original
+    : optimizedImageSrc(original, fullWidth, fullQuality);
   const [previewSrc, setPreviewSrc] = useState(previewTarget);
   const [fullSrc, setFullSrc] = useState(fullTarget);
   const [previewReady, setPreviewReady] = useState(false);
