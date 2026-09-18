@@ -15,11 +15,11 @@ import {
   SECTION_AXIS_LOCK_MIN,
   SECTION_SWIPE_MIN,
 } from "@/lib/home-scroll";
-import type { HeroSlide } from "@/lib/site-content";
+import type { HeroSlideView } from "@/lib/get-home-hero-slides";
 import { cn } from "@/lib/utils";
 
 interface HeroCarouselProps {
-  slides: HeroSlide[];
+  slides: HeroSlideView[];
   className?: string;
   projectsAnchorId?: string;
 }
@@ -27,6 +27,8 @@ interface HeroCarouselProps {
 const WHEEL_COOLDOWN_MS = 420;
 /** Debounce ngắn khi browser chưa có scrollend — tránh flicker giữa 2 slide. */
 const SCROLL_INDEX_DEBOUNCE_MS = 50;
+/** iOS/Android: sau touch còn synthetic mouse/pointer (~300ms) — chặn để khỏi next 2 slide. */
+const GHOST_POINTER_MS = 600;
 
 type Point = { x: number; y: number };
 
@@ -57,6 +59,7 @@ export function HeroCarousel({
   const axisRef = useRef<"horizontal" | "vertical" | null>(null);
   const touchArmedRef = useRef(false);
   const ignoreClickUntilRef = useRef(0);
+  const lastTouchAtRef = useRef(0);
   const wheelLockRef = useRef(0);
   const goToRef = useRef<(index: number) => void>(() => {});
   const activeIndexRef = useRef(0);
@@ -182,13 +185,21 @@ export function HeroCarousel({
     if (isHovered && canHoverPauseAutoplay()) return;
     const timer = window.setInterval(() => {
       goToRef.current(activeIndexRef.current + 1);
-    }, 6000);
+    }, 3000);
     return () => window.clearInterval(timer);
   }, [slides.length, isHovered, isHeroActive]);
 
   useEffect(() => {
     const section = sectionRef.current;
     if (!section) return;
+
+    const markTouch = () => {
+      lastTouchAtRef.current = Date.now();
+      ignoreClickUntilRef.current = Date.now() + GHOST_POINTER_MS;
+    };
+
+    const recentlyTouched = () =>
+      Date.now() - lastTouchAtRef.current < GHOST_POINTER_MS;
 
     const arm = (point: Point) => {
       if (!isHeroGestureActive()) return false;
@@ -212,13 +223,14 @@ export function HeroCarousel({
       const resolved = axis ?? (absX >= absY ? "horizontal" : "vertical");
       const isTap = absX < SECTION_SWIPE_MIN && absY < SECTION_SWIPE_MIN;
 
-      ignoreClickUntilRef.current = Date.now() + 400;
+      ignoreClickUntilRef.current = Date.now() + GHOST_POINTER_MS;
 
       if (isTap) {
         goToRef.current(activeIndexRef.current + 1);
         return;
       }
 
+      /* Ngang: chỉ native scroll-snap — không goTo (tránh next 2 slide). */
       if (resolved === "horizontal") {
         return;
       }
@@ -242,6 +254,7 @@ export function HeroCarousel({
     const onTouchStart = (event: TouchEvent) => {
       if (event.touches.length !== 1 || isControlTarget(event.target)) return;
       const touch = event.touches[0];
+      markTouch();
       if (!arm({ x: touch.clientX, y: touch.clientY })) return;
       touchArmedRef.current = true;
     };
@@ -253,6 +266,7 @@ export function HeroCarousel({
     };
 
     const onTouchEnd = (event: TouchEvent) => {
+      markTouch();
       if (!touchArmedRef.current) return;
       const touch = event.changedTouches[0];
       finish(touch.clientX, touch.clientY);
@@ -260,6 +274,8 @@ export function HeroCarousel({
 
     const onPointerDown = (event: PointerEvent) => {
       if (event.pointerType === "touch" || isControlTarget(event.target)) return;
+      /* Ghost mouse sau touch — không arm lại (tránh tap lần 2). */
+      if (recentlyTouched()) return;
       if (!arm({ x: event.clientX, y: event.clientY })) return;
     };
 
@@ -270,12 +286,17 @@ export function HeroCarousel({
 
     const onPointerUp = (event: PointerEvent) => {
       if (event.pointerType === "touch" || !originRef.current) return;
+      if (recentlyTouched()) {
+        originRef.current = null;
+        axisRef.current = null;
+        return;
+      }
       finish(event.clientX, event.clientY);
     };
 
     const onClick = (event: MouseEvent) => {
       if (isControlTarget(event.target)) return;
-      if (Date.now() < ignoreClickUntilRef.current) {
+      if (recentlyTouched() || Date.now() < ignoreClickUntilRef.current) {
         event.preventDefault();
         return;
       }
@@ -348,9 +369,13 @@ export function HeroCarousel({
           );
 
           return (
-            <div key={`${item.image}-${index}`} data-hero-slide aria-hidden={index !== activeIndex}>
+            <div
+              key={`${item.mobileImage}-${item.desktopImage}-${index}`}
+              data-hero-slide
+              aria-hidden={index !== activeIndex}
+            >
               <ProgressiveImage
-                src={item.image}
+                src={item.mobileImage || item.desktopImage}
                 alt={item.title}
                 previewWidth={CANVAS_PREVIEW_WIDTH}
                 fullWidth={CANVAS_FULL_WIDTH}
@@ -358,7 +383,18 @@ export function HeroCarousel({
                 loadFull={distance <= 1}
                 persistFull
                 priority={index === 0}
-                className="pointer-events-none object-cover"
+                className="pointer-events-none object-cover md:hidden"
+              />
+              <ProgressiveImage
+                src={item.desktopImage || item.mobileImage}
+                alt={item.title}
+                previewWidth={CANVAS_PREVIEW_WIDTH}
+                fullWidth={CANVAS_FULL_WIDTH}
+                loadPreview={distance <= 1}
+                loadFull={distance <= 1}
+                persistFull
+                priority={index === 0}
+                className="pointer-events-none hidden object-cover md:block"
               />
             </div>
           );

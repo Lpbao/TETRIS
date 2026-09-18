@@ -59,12 +59,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
       const isLoginPage = request.nextUrl.pathname === "/admin/login";
 
-      if (isAdminRoute && !isLoginPage) {
-        return isLoggedIn;
+      // Redirect bằng request origin — tránh NextAuth dùng NEXTAUTH_URL sai
+      // (vd. placeholder tetris-xxx.vercel.app → DEPLOYMENT_NOT_FOUND).
+      if (isAdminRoute && !isLoginPage && !isLoggedIn) {
+        const login = new URL("/admin/login", request.nextUrl.origin);
+        login.searchParams.set("callbackUrl", request.nextUrl.href);
+        return Response.redirect(login);
       }
 
       if (isLoginPage && isLoggedIn) {
-        return Response.redirect(new URL("/admin", request.nextUrl));
+        return Response.redirect(new URL("/admin", request.nextUrl.origin));
       }
 
       return true;

@@ -4,6 +4,7 @@ import {
   aboutPageSchema,
   contactPageSchema,
   homePageSchema,
+  homeSlidesToFormValues,
   servicesPageSchema,
   type AboutPageContent,
   type ContactPageContent,
@@ -114,7 +115,8 @@ export function resolveSitePageContent(
   switch (slug) {
     case "home": {
       const parsed = homePageSchema.safeParse(content);
-      return parsed.success ? parsed.data : getSitePageFallback("home");
+      if (!parsed.success) return getSitePageFallback("home");
+      return homeSlidesToFormValues(parsed.data.slides);
     }
     case "about": {
       const parsed = aboutPageSchema.safeParse(content);

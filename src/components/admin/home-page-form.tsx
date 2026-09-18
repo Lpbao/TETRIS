@@ -14,15 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  homePageSchema,
+  homeFormValuesToSlides,
+  homePageFormSchema,
   type HomePageFormValues,
 } from "@/lib/validations/site-page";
 
-const emptySlide = {
-  image: "",
+const emptySlide: HomePageFormValues["slides"][number] = {
   title: "",
   location: "",
   href: "/projects",
+  mobileImage: "",
+  desktopImage: "",
 };
 
 export function HomePageForm({
@@ -42,7 +44,7 @@ export function HomePageForm({
     setValue,
     formState: { errors },
   } = useForm<HomePageFormValues>({
-    resolver: zodResolver(homePageSchema),
+    resolver: zodResolver(homePageFormSchema),
     defaultValues: initialData,
   });
 
@@ -56,7 +58,7 @@ export function HomePageForm({
     setError(null);
     setSuccess(null);
     try {
-      await putSitePage("home", data);
+      await putSitePage("home", { slides: homeFormValuesToSlides(data) });
       setSuccess("Đã lưu slider trang chủ.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không lưu được");
@@ -69,7 +71,8 @@ export function HomePageForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {fields.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Chưa có slide trên database. Thêm slide, chọn ảnh từ Media, rồi lưu.
+          Chưa có slide trên database. Thêm slide, chọn ảnh Mobile + Desktop từ
+          Media, rồi lưu.
         </p>
       )}
 
@@ -110,15 +113,38 @@ export function HomePageForm({
             </div>
           </div>
 
-          <CoverImagePicker
-            label="Ảnh slider"
-            description="Chọn ảnh từ Media"
-            value={watch(`slides.${index}.image`)}
-            onChange={(url) =>
-              setValue(`slides.${index}.image`, url, { shouldValidate: true })
-            }
-          />
-          <FieldError message={errors.slides?.[index]?.image?.message} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <CoverImagePicker
+                label="Ảnh Mobile"
+                description="Hiển thị trên mobile / tablet hẹp"
+                value={watch(`slides.${index}.mobileImage`)}
+                onChange={(url) =>
+                  setValue(`slides.${index}.mobileImage`, url, {
+                    shouldValidate: true,
+                  })
+                }
+              />
+              <FieldError
+                message={errors.slides?.[index]?.mobileImage?.message}
+              />
+            </div>
+            <div className="space-y-2">
+              <CoverImagePicker
+                label="Ảnh Desktop"
+                description="Hiển thị từ breakpoint md trở lên"
+                value={watch(`slides.${index}.desktopImage`)}
+                onChange={(url) =>
+                  setValue(`slides.${index}.desktopImage`, url, {
+                    shouldValidate: true,
+                  })
+                }
+              />
+              <FieldError
+                message={errors.slides?.[index]?.desktopImage?.message}
+              />
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor={`slide-title-${index}`}>Tiêu đề</Label>

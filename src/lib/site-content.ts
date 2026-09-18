@@ -145,6 +145,8 @@ export interface HeroSlide {
   title: string;
   location: string;
   href: string;
+  /** MOBILE | DESKTOP — thiếu (legacy) coi như dùng chung. */
+  screenType?: "MOBILE" | "DESKTOP";
 }
 
 /** Public project — map Prisma `Post` (coverImage, images, concept, address). */
@@ -239,30 +241,70 @@ export const siteHeroSlides: HeroSlide[] = [
     title: "D.CHIC SHOWROOM",
     location: "TRÀNG TIỀN, HÀ NỘI",
     href: "/projects/d-chic",
+    screenType: "MOBILE",
+  },
+  {
+    image: "/site/hero/sliderHome1.jpg",
+    title: "D.CHIC SHOWROOM",
+    location: "TRÀNG TIỀN, HÀ NỘI",
+    href: "/projects/d-chic",
+    screenType: "DESKTOP",
   },
   {
     image: "/site/hero/sliderHome2.jpg",
     title: "TETRIS DESIGN",
     location: "HÀ NỘI",
     href: "/projects",
+    screenType: "MOBILE",
+  },
+  {
+    image: "/site/hero/sliderHome2.jpg",
+    title: "TETRIS DESIGN",
+    location: "HÀ NỘI",
+    href: "/projects",
+    screenType: "DESKTOP",
   },
   {
     image: "/site/hero/sliderHome3.jpg",
     title: "SKY GEM",
     location: "HÀ NỘI",
     href: "/projects",
+    screenType: "MOBILE",
+  },
+  {
+    image: "/site/hero/sliderHome3.jpg",
+    title: "SKY GEM",
+    location: "HÀ NỘI",
+    href: "/projects",
+    screenType: "DESKTOP",
   },
   {
     image: "/site/hero/sliderHome4.jpg",
     title: "TETRIS DESIGN",
     location: "HÀ NỘI",
     href: "/projects",
+    screenType: "MOBILE",
+  },
+  {
+    image: "/site/hero/sliderHome4.jpg",
+    title: "TETRIS DESIGN",
+    location: "HÀ NỘI",
+    href: "/projects",
+    screenType: "DESKTOP",
   },
   {
     image: "/site/hero/sliderHome5.jpg",
     title: "TETRIS DESIGN",
     location: "HÀ NỘI",
     href: "/projects",
+    screenType: "MOBILE",
+  },
+  {
+    image: "/site/hero/sliderHome5.jpg",
+    title: "TETRIS DESIGN",
+    location: "HÀ NỘI",
+    href: "/projects",
+    screenType: "DESKTOP",
   },
 ];
 
