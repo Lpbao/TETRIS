@@ -89,6 +89,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             alt={post.title}
             fill
             priority
+            unoptimized
             className="object-cover grayscale"
             sizes="(max-width: 768px) 100vw, 768px"
           />

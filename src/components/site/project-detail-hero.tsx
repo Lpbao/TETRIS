@@ -21,6 +21,7 @@ export function ProjectDetailHero({
           alt={project.title}
           fill
           priority
+          unoptimized
           className={cn(
             "object-contain p-8 md:object-cover md:p-0 md:grayscale",
             !project.heroImage && "p-12 md:p-16",

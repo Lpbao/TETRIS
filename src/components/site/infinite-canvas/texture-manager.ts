@@ -2,8 +2,6 @@
 
 import * as THREE from "three";
 import {
-  CANVAS_FULL_QUALITY,
-  CANVAS_FULL_WIDTH,
   CANVAS_PREVIEW_QUALITY,
   CANVAS_PREVIEW_WIDTH,
   canvasImageSrc,
@@ -75,7 +73,8 @@ const emitPreview = (url: string, tex: THREE.Texture) => {
 const upgradeToFull = async (url: string, tex: THREE.Texture) => {
   if (phaseByUrl.get(url) === "full") return;
 
-  const fullSrc = canvasImageSrc(url, CANVAS_FULL_WIDTH, CANVAS_FULL_QUALITY);
+  // Full = storage URL (no /_next/image re-encode @ 1200).
+  const fullSrc = url;
   const previewSrc = canvasImageSrc(
     url,
     CANVAS_PREVIEW_WIDTH,
@@ -97,15 +96,7 @@ const upgradeToFull = async (url: string, tex: THREE.Texture) => {
   try {
     applyFull(await loadImage(fullSrc));
   } catch (err) {
-    if (fullSrc === url) {
-      console.error("Texture full load failed:", url, err);
-      return;
-    }
-    try {
-      applyFull(await loadImage(url));
-    } catch (fallbackErr) {
-      console.error("Texture full load failed:", url, fallbackErr);
-    }
+    console.error("Texture full load failed:", url, err);
   }
 };
 
@@ -149,7 +140,7 @@ export const unwatchTexture = (
   previewCallbacks.get(url.trim())?.delete(onLoad);
 };
 
-/** Preview (640) first so planes can fade in, then swap the same texture to 1200. */
+/** Preview (640) first so planes can fade in, then swap the same texture to storage original. */
 export const getTexture = (
   item: MediaItem,
   onLoad?: (texture: THREE.Texture) => void,

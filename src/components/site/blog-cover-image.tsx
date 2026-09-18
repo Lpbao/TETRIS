@@ -22,6 +22,7 @@ export function BlogCoverImage({
           src={src}
           alt={alt}
           fill
+          unoptimized
           className="object-cover grayscale transition-transform duration-300 hover:scale-[1.02]"
           sizes="(max-width: 768px) 100vw, 768px"
         />

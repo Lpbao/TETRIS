@@ -379,7 +379,6 @@ export function HeroCarousel({
                 alt={item.title}
                 previewWidth={CANVAS_PREVIEW_WIDTH}
                 fullWidth={CANVAS_FULL_WIDTH}
-                fullUseOriginal
                 loadPreview={distance <= 1}
                 loadFull={distance <= 1}
                 persistFull
@@ -391,7 +390,6 @@ export function HeroCarousel({
                 alt={item.title}
                 previewWidth={CANVAS_PREVIEW_WIDTH}
                 fullWidth={CANVAS_FULL_WIDTH}
-                fullUseOriginal
                 loadPreview={distance <= 1}
                 loadFull={distance <= 1}
                 persistFull

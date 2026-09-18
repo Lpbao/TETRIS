@@ -56,6 +56,7 @@ export function ProjectCard({
           src={src}
           alt={project.title}
           fill
+          unoptimized
           className={cn(
             "object-contain object-center",
             isGallery && "transition-transform duration-300 group-hover:scale-[1.02]",

@@ -16,15 +16,19 @@ export function SiteImage({
   popOnHover = false,
   src,
   alt,
+  unoptimized,
   ...props
 }: SiteImageProps) {
   const srcString = typeof src === "string" ? src : "";
   const useBlur = blur && srcString && !isSvgSrc(srcString);
+  const skipOptimize =
+    unoptimized ?? (Boolean(srcString) && !isSvgSrc(srcString));
 
   return (
     <Image
       src={src}
       alt={alt}
+      unoptimized={skipOptimize}
       className={cn(
         grayscale && "grayscale",
         popOnHover && "site-image--pop-hover",

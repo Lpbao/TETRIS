@@ -1,7 +1,8 @@
 /**
  * Widths must stay in `next.config.ts` `images.deviceSizes` or `imageSizes`.
  * Qualities must stay in `images.qualities`.
- * Hero slider full layer uses storage URL (`fullUseOriginal`) — not these full constants.
+ * ProgressiveImage full layer defaults to storage URL (`fullUseOriginal`);
+ * these FULL_* constants are for preview upgrades / optional optimizer full.
  */
 export const CANVAS_PREVIEW_WIDTH = 640;
 export const CANVAS_PREVIEW_QUALITY = 45;
