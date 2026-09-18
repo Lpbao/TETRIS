@@ -1,5 +1,5 @@
-/** Cạnh dài tối đa — đủ hero/slider, cắt ảnh điện thoại 4–6k. */
-export const MEDIA_IMAGE_MAX_EDGE = 2560;
+/** Cạnh dài tối đa — giữ UHD/4K long-edge; cắt ảnh điện thoại lớn hơn. */
+export const MEDIA_IMAGE_MAX_EDGE = 3840;
 
 /** WebP quality — gần như không khác mắt, giảm mạnh dung lượng. */
 export const MEDIA_WEBP_QUALITY = 82;
@@ -44,7 +44,7 @@ function withWebpExtension(filename: string) {
 }
 
 /**
- * Nén ảnh raster lúc upload: xoay theo EXIF, fit trong 2560px, WebP q82.
+ * Nén ảnh raster lúc upload: xoay theo EXIF, fit trong 3840px, WebP q82.
  * Bỏ qua SVG, video, GIF/WebP động. Nếu file nén không nhỏ hơn bản gốc
  * (và không cần resize) thì giữ nguyên.
  * Sharp/libvips lỗi load → passthrough (upload vẫn thành công).

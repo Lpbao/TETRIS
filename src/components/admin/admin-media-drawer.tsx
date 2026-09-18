@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Sheet } from "@/components/ui/sheet";
 import { useMediaInfiniteList } from "@/hooks/use-media-infinite-list";
 import { validateMediaFile, type MediaItem } from "@/lib/media";
-import { cn } from "@/lib/utils";
 import {
   MEDIA_TITLE_CONFLICT_ERROR,
   MEDIA_TITLE_MAX,
@@ -19,6 +18,11 @@ import {
   type MediaTitleConflict,
   updatePendingTitle,
 } from "@/lib/media-upload-titles";
+import {
+  MediaUploadHttpError,
+  uploadMediaFile,
+} from "@/lib/upload-media-file";
+import { cn } from "@/lib/utils";
 
 type PendingUpload = {
   id: string;
@@ -227,7 +231,9 @@ export function AdminMediaDrawer() {
     setConflictIds(new Set());
 
     const uploadedIds: string[] = [];
-    let uploadConflict: { id: string; suggested: string } | null = null;
+    const conflictState: {
+      current: { id: string; suggested: string } | null;
+    } = { current: null };
 
     try {
       const checkRes = await fetch("/api/media/check-titles", {
@@ -261,26 +267,18 @@ export function AdminMediaDrawer() {
       }
 
       for (const item of pending) {
-        const formData = new FormData();
-        formData.append("file", item.file);
-        formData.append("title", item.title.trim());
-
-        const res = await fetch("/api/media", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const result: unknown = await res.json().catch(() => null);
-          if (res.status === 409) {
-            const suggested = readTitleConflicts(result)[0]?.suggested;
+        try {
+          await uploadMediaFile(item.file, item.title.trim());
+        } catch (err) {
+          if (err instanceof MediaUploadHttpError && err.status === 409) {
+            const suggested = err.conflicts[0]?.suggested;
             if (suggested) {
-              uploadConflict = { id: item.id, suggested };
+              conflictState.current = { id: item.id, suggested };
             }
           }
-          throw new Error(
-            payloadError(result) ?? `Upload thất bại: ${item.file.name}`,
-          );
+          throw err instanceof Error
+            ? err
+            : new Error(`Upload thất bại: ${item.file.name}`);
         }
 
         uploadedIds.push(item.id);
@@ -292,19 +290,20 @@ export function AdminMediaDrawer() {
       await reload();
       window.dispatchEvent(new Event("admin-media-changed"));
     } catch (err) {
+      const conflict = conflictState.current;
       const remaining = pending
         .filter((item) => !uploadedIds.includes(item.id))
         .map((item) =>
-          uploadConflict && item.id === uploadConflict.id
-            ? { ...item, title: uploadConflict.suggested, dirty: true }
+          conflict && item.id === conflict.id
+            ? { ...item, title: conflict.suggested, dirty: true }
             : item,
         );
       setPending(remaining);
       if (seedId && !remaining.some((item) => item.id === seedId)) {
         setSeedId(null);
       }
-      if (uploadConflict) {
-        setConflictIds(new Set([uploadConflict.id]));
+      if (conflict) {
+        setConflictIds(new Set([conflict.id]));
         setError(
           `${err instanceof Error ? err.message : MEDIA_TITLE_CONFLICT_ERROR}. Đã điền tên gợi ý vào ô trùng, kiểm tra rồi bấm Upload lại.`,
         );

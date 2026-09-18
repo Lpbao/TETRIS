@@ -50,8 +50,8 @@ export function maxUploadBytes(mimeType: string, type: MediaType) {
   return MAX_IMAGE_STORED_SIZE;
 }
 
-export function validateMediaFile(file: File) {
-  const type = getMediaType(file.type);
+export function validateMediaMeta(mimeType: string, size: number) {
+  const type = getMediaType(mimeType);
   if (!type) {
     return {
       valid: false as const,
@@ -59,8 +59,8 @@ export function validateMediaFile(file: File) {
     };
   }
 
-  const maxSize = maxUploadBytes(file.type, type);
-  if (file.size > maxSize) {
+  const maxSize = maxUploadBytes(mimeType, type);
+  if (size > maxSize) {
     const kind = type === "image" ? "ảnh" : "video";
     return {
       valid: false as const,
@@ -69,6 +69,10 @@ export function validateMediaFile(file: File) {
   }
 
   return { valid: true as const, type };
+}
+
+export function validateMediaFile(file: File) {
+  return validateMediaMeta(file.type, file.size);
 }
 
 export function buildMediaMarkdown(

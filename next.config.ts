@@ -66,6 +66,12 @@ const nextConfig: NextConfig = {
       "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
       "./node_modules/@img/sharp-linuxmusl-x64/**/*",
     ],
+    "/api/media/complete": [
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
+      "./node_modules/@img/sharp-linuxmusl-x64/**/*",
+    ],
   },
   experimental: {
     serverActions: {
