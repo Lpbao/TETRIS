@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { ProjectDetailLightbox } from "@/components/site/project-detail-lightbox";
 import { ProgressiveImage } from "@/components/site/progressive-image";
 import {
   CANVAS_FULL_WIDTH,
@@ -13,12 +17,14 @@ interface ProjectDetailImagesDefaultProps {
 
 const EAGER_COUNT = 4;
 
-/** Gallery LAYOUTDEFAULT — stack ảnh full width, pad ngang token header, không animation/lightbox. */
+/** Gallery LAYOUTDEFAULT — stack ảnh, cursor mắt khi hover, lightbox như LAYOUT1. */
 export function ProjectDetailImagesDefault({
   images,
   title,
   className,
 }: ProjectDetailImagesDefaultProps) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
   if (images.length === 0) return null;
 
   return (
@@ -31,18 +37,32 @@ export function ProjectDetailImagesDefault({
           key={`${src}-${index}`}
           className="project-detail-images-default__item"
         >
-          <ProgressiveImage
-            src={src}
-            alt={`${title} — ${index + 1}`}
-            previewWidth={CANVAS_PREVIEW_WIDTH}
-            fullWidth={CANVAS_FULL_WIDTH}
-            layout="flow"
-            loading={index < EAGER_COUNT ? "eager" : "lazy"}
-            sizes="100vw"
-            className="project-detail-images-default__img"
-          />
+          <button
+            type="button"
+            className="project-detail-images-default__trigger"
+            onClick={() => setLightboxIndex(index)}
+            aria-label={`Xem ${title} — ${String(index + 1).padStart(2, "0")}`}
+          >
+            <ProgressiveImage
+              src={src}
+              alt={`${title} — ${index + 1}`}
+              previewWidth={CANVAS_PREVIEW_WIDTH}
+              fullWidth={CANVAS_FULL_WIDTH}
+              layout="flow"
+              loading={index < EAGER_COUNT ? "eager" : "lazy"}
+              sizes="100vw"
+              className="project-detail-images-default__img lg:h-auto lg:w-full lg:max-h-[70vh] lg:max-w-full lg:object-contain lg:object-center"
+            />
+          </button>
         </figure>
       ))}
+
+      <ProjectDetailLightbox
+        images={images}
+        title={title}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
     </section>
   );
 }

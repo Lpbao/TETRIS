@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, EyeOff } from "lucide-react";
 import { ProgressiveImage } from "@/components/site/progressive-image";
 import {
   CANVAS_FULL_WIDTH,
@@ -11,6 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 
 const SWIPE_MIN_PX = 48;
+/** iOS ghost-click sau unmount — giữ khóa header để khỏi mở menu. */
+const HEADER_LOCK_AFTER_CLOSE_MS = 400;
 
 interface ProjectDetailLightboxProps {
   images: string[];
@@ -30,6 +32,7 @@ export function ProjectDetailLightbox({
   const [current, setCurrent] = useState(0);
   const [mounted, setMounted] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const headerLockTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -55,14 +58,18 @@ export function ProjectDetailLightbox({
     (event: React.SyntheticEvent) => {
       event.preventDefault();
       event.stopPropagation();
-      /* Defer unmount — nếu đóng ngay trong click, sự kiện lọt xuống nút menu header. */
-      window.setTimeout(onClose, 0);
+      onClose();
     },
     [onClose],
   );
 
   useEffect(() => {
     if (!open) return;
+
+    if (headerLockTimerRef.current !== null) {
+      window.clearTimeout(headerLockTimerRef.current);
+      headerLockTimerRef.current = null;
+    }
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -78,9 +85,22 @@ export function ProjectDetailLightbox({
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
-      document.documentElement.removeAttribute("data-lightbox-open");
+      headerLockTimerRef.current = window.setTimeout(() => {
+        document.documentElement.removeAttribute("data-lightbox-open");
+        headerLockTimerRef.current = null;
+      }, HEADER_LOCK_AFTER_CLOSE_MS);
     };
   }, [open, onClose, goPrev, goNext]);
+
+  useEffect(() => {
+    return () => {
+      if (headerLockTimerRef.current !== null) {
+        window.clearTimeout(headerLockTimerRef.current);
+        headerLockTimerRef.current = null;
+      }
+      document.documentElement.removeAttribute("data-lightbox-open");
+    };
+  }, []);
 
   if (!mounted || !open) return null;
 
@@ -131,14 +151,14 @@ export function ProjectDetailLightbox({
         type="button"
         variant="ghost"
         size="icon"
-        className="project-detail-lightbox__close"
+        className="project-detail-lightbox__close hover:bg-[#7a1f27] hover:text-white"
         onPointerDown={(event) => {
           event.stopPropagation();
         }}
         onClick={handleClose}
         aria-label="Đóng"
       >
-        <X className="h-6 w-6" />
+        <EyeOff className="h-5 w-5" strokeWidth={1.75} />
       </Button>
 
       {images.length > 1 ? (

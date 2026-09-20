@@ -1,7 +1,6 @@
 "use client";
 
 import { ProjectDetailContent } from "@/components/site/project-detail-content";
-import { ProjectDetailCover } from "@/components/site/project-detail-cover";
 import { ProjectDetailImagesDefault } from "@/components/site/project-detail-images-default";
 import { ProjectDetailImagesLayout2 } from "@/components/site/project-detail-images-layout2";
 import { ProjectShowcase } from "@/components/site/project-showcase";
@@ -17,7 +16,6 @@ import type { ContactPageContent } from "@/lib/validations/site-page";
 
 interface ProjectDetailLayout2ScrollProps {
   title: string;
-  coverSrc: string;
   concept: string;
   address: string;
   description: string;
@@ -28,7 +26,6 @@ interface ProjectDetailLayout2ScrollProps {
 
 export function ProjectDetailLayout2Scroll({
   title,
-  coverSrc,
   concept,
   address,
   description,
@@ -41,12 +38,6 @@ export function ProjectDetailLayout2Scroll({
   if (reduced) {
     return (
       <article data-project-detail>
-        <ProjectDetailCover
-          title={title}
-          src={coverSrc}
-          concept={concept}
-          address={address}
-        />
         {images.length > 0 ? (
           <ProjectDetailImagesDefault images={images} title={title} />
         ) : null}
@@ -66,23 +57,11 @@ export function ProjectDetailLayout2Scroll({
   const panels: FullPageScrollSection[] = [
     {
       def: PROJECT_DETAIL_LAYOUT2_SECTIONS[0]!,
-      "aria-label": title,
-      children: (
-        <ProjectDetailCover
-          title={title}
-          src={coverSrc}
-          concept={concept}
-          address={address}
-        />
-      ),
-    },
-    {
-      def: PROJECT_DETAIL_LAYOUT2_SECTIONS[1]!,
       "aria-label": "Ảnh dự án",
       children: <ProjectDetailImagesLayout2 images={images} title={title} />,
     },
     {
-      def: PROJECT_DETAIL_LAYOUT2_SECTIONS[2]!,
+      def: PROJECT_DETAIL_LAYOUT2_SECTIONS[1]!,
       "aria-label": "Mô tả và dự án liên quan",
       children: (
         <>

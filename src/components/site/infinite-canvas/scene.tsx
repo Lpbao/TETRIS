@@ -18,6 +18,7 @@ import {
   KEYBOARD_SPEED,
   MAX_VELOCITY,
   RENDER_DISTANCE,
+  SELECT_SLOP_PX,
   VELOCITY_DECAY,
   VELOCITY_LERP,
 } from "./constants";
@@ -63,22 +64,30 @@ type CameraGridState = {
   camZ: number;
 };
 
+function isLightboxOpen() {
+  return document.documentElement.hasAttribute("data-lightbox-open");
+}
+
 function MediaPlane({
   position,
   scale,
   media,
+  mediaIndex,
   chunkCx,
   chunkCy,
   chunkCz,
   cameraGridRef,
+  onHoverChange,
 }: {
   position: THREE.Vector3;
   scale: THREE.Vector3;
   media: MediaItem;
+  mediaIndex: number;
   chunkCx: number;
   chunkCy: number;
   chunkCz: number;
   cameraGridRef: React.RefObject<CameraGridState>;
+  onHoverChange?: (index: number | null) => void;
 }) {
   const meshRef = React.useRef<THREE.Mesh>(null);
   const materialRef = React.useRef<THREE.MeshBasicMaterial>(null);
@@ -201,7 +210,23 @@ function MediaPlane({
   }
 
   return (
-    <mesh ref={meshRef} position={position} scale={displayScale} visible={false} geometry={PLANE_GEOMETRY}>
+    <mesh
+      ref={meshRef}
+      position={position}
+      scale={displayScale}
+      visible={false}
+      geometry={PLANE_GEOMETRY}
+      userData={{ mediaIndex }}
+      onPointerOver={
+        onHoverChange
+          ? (event) => {
+              event.stopPropagation();
+              onHoverChange(mediaIndex);
+            }
+          : undefined
+      }
+      onPointerOut={onHoverChange ? () => onHoverChange(null) : undefined}
+    >
       <meshBasicMaterial ref={materialRef} transparent opacity={0} side={THREE.DoubleSide} />
     </mesh>
   );
@@ -213,12 +238,14 @@ function Chunk({
   cz,
   media,
   cameraGridRef,
+  onHoverChange,
 }: {
   cx: number;
   cy: number;
   cz: number;
   media: MediaItem[];
   cameraGridRef: React.RefObject<CameraGridState>;
+  onHoverChange?: (index: number | null) => void;
 }) {
   const [planes, setPlanes] = React.useState<PlaneData[] | null>(null);
 
@@ -249,7 +276,8 @@ function Chunk({
   return (
     <group>
       {planes.map((plane) => {
-        const mediaItem = media[plane.mediaIndex % media.length];
+        const mediaIndex = plane.mediaIndex % media.length;
+        const mediaItem = media[mediaIndex];
 
         if (!mediaItem) {
           return null;
@@ -261,10 +289,12 @@ function Chunk({
             position={plane.position}
             scale={plane.scale}
             media={mediaItem}
+            mediaIndex={mediaIndex}
             chunkCx={cx}
             chunkCy={cy}
             chunkCz={cz}
             cameraGridRef={cameraGridRef}
+            onHoverChange={onHoverChange}
           />
         );
       })}
@@ -304,18 +334,79 @@ const createInitialState = (camZ: number): ControllerState => ({
   pendingChunk: null,
 });
 
-function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onTextureProgress?: (progress: number) => void }) {
-  const { camera, gl } = useThree();
+function SceneController({
+  media,
+  onMediaSelect,
+  onTextureProgress,
+}: {
+  media: MediaItem[];
+  onMediaSelect?: (index: number) => void;
+  onTextureProgress?: (progress: number) => void;
+}) {
+  const { camera, gl, scene } = useThree();
   const isTouchDevice = useIsTouchDevice();
   const [, getKeys] = useKeyboardControls<keyof KeyboardKeys>();
 
   const state = React.useRef<ControllerState>(createInitialState(INITIAL_CAMERA_Z));
   const cameraGridRef = React.useRef<CameraGridState>({ cx: 0, cy: 0, cz: 0, camZ: camera.position.z });
+  const hoverIndexRef = React.useRef<number | null>(null);
+  const pointerStartRef = React.useRef<{ x: number; y: number; index: number | null } | null>(null);
+  const pointerMovedRef = React.useRef(false);
+  const onMediaSelectRef = React.useRef(onMediaSelect);
+  onMediaSelectRef.current = onMediaSelect;
+  const raycaster = React.useMemo(() => new THREE.Raycaster(), []);
+  const ndc = React.useMemo(() => new THREE.Vector2(), []);
+  const hitMediaIndexRef = React.useRef<(x: number, y: number) => number | null>(() => null);
+  hitMediaIndexRef.current = (clientX, clientY) => {
+    const rect = gl.domElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObjects(scene.children, true);
+    for (const hit of hits) {
+      if (!hit.object.visible) continue;
+      const idx = hit.object.userData.mediaIndex;
+      if (typeof idx === "number") return idx;
+    }
+    return null;
+  };
 
   const [chunks, setChunks] = React.useState<ChunkData[]>([]);
 
   const { progress } = useProgress();
   const maxProgress = React.useRef(0);
+
+  const setWrapperCursor = React.useCallback(
+    (mode: "grab" | "grabbing" | "eye") => {
+      const root = gl.domElement.closest(".infinite-canvas");
+      if (root instanceof HTMLElement) {
+        root.dataset.cursor = mode;
+      }
+    },
+    [gl],
+  );
+
+  const syncCursor = React.useCallback(() => {
+    const s = state.current;
+    if (s.isDragging && pointerMovedRef.current) {
+      setWrapperCursor("grabbing");
+      return;
+    }
+    if (hoverIndexRef.current != null && onMediaSelectRef.current) {
+      setWrapperCursor("eye");
+      return;
+    }
+    setWrapperCursor("grab");
+  }, [setWrapperCursor]);
+
+  const onHoverChange = React.useCallback(
+    (index: number | null) => {
+      hoverIndexRef.current = index;
+      syncCursor();
+    },
+    [syncCursor],
+  );
 
   React.useEffect(() => {
     const rounded = Math.round(progress);
@@ -329,28 +420,60 @@ function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onT
   React.useEffect(() => {
     const canvas = gl.domElement;
     const s = state.current;
-    canvas.style.cursor = "grab";
+    setWrapperCursor("grab");
 
-    const setCursor = (cursor: string) => {
-      canvas.style.cursor = cursor;
+    const markMoved = (x: number, y: number) => {
+      const start = pointerStartRef.current;
+      if (!start || pointerMovedRef.current) return;
+      const dx = x - start.x;
+      const dy = y - start.y;
+      if (dx * dx + dy * dy > SELECT_SLOP_PX * SELECT_SLOP_PX) {
+        pointerMovedRef.current = true;
+        syncCursor();
+      }
+    };
+
+    const trySelect = () => {
+      const start = pointerStartRef.current;
+      const select = onMediaSelectRef.current;
+      if (!pointerMovedRef.current && start?.index != null && select) {
+        select(start.index);
+      }
+      pointerStartRef.current = null;
+      pointerMovedRef.current = false;
+      s.isDragging = false;
+      syncCursor();
     };
 
     const onMouseDown = (e: MouseEvent) => {
-      // Just start dragging - keep drift frozen at current value
+      if (isLightboxOpen()) return;
       s.isDragging = true;
       s.lastMouse = { x: e.clientX, y: e.clientY };
-      setCursor("grabbing");
+      pointerStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        index: hitMediaIndexRef.current(e.clientX, e.clientY) ?? hoverIndexRef.current,
+      };
+      pointerMovedRef.current = false;
     };
 
     const onMouseUp = () => {
-      s.isDragging = false;
-      setCursor("grab");
+      if (isLightboxOpen()) {
+        s.isDragging = false;
+        pointerStartRef.current = null;
+        pointerMovedRef.current = false;
+        return;
+      }
+      trySelect();
     };
 
     const onMouseLeave = () => {
       s.mouse = { x: 0, y: 0 };
       s.isDragging = false;
-      setCursor("grab");
+      hoverIndexRef.current = null;
+      pointerStartRef.current = null;
+      pointerMovedRef.current = false;
+      setWrapperCursor("grab");
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -360,6 +483,7 @@ function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onT
       };
 
       if (s.isDragging) {
+        markMoved(e.clientX, e.clientY);
         s.targetVel.x -= (e.clientX - s.lastMouse.x) * 0.025;
         s.targetVel.y += (e.clientY - s.lastMouse.y) * 0.025;
         s.lastMouse = { x: e.clientX, y: e.clientY };
@@ -367,20 +491,35 @@ function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onT
     };
 
     const onWheel = (e: WheelEvent) => {
+      if (isLightboxOpen()) return;
       e.preventDefault();
       e.stopPropagation();
       s.scrollAccum += e.deltaY * 0.006;
     };
 
     const onTouchStart = (e: TouchEvent) => {
+      if (isLightboxOpen()) return;
       e.preventDefault();
       e.stopPropagation();
       s.lastTouches = Array.from(e.touches) as Touch[];
       s.lastTouchDist = getTouchDistance(s.lastTouches);
-      setCursor("grabbing");
+      const [touch] = s.lastTouches;
+      if (e.touches.length === 1 && touch) {
+        s.isDragging = true;
+        pointerStartRef.current = {
+          x: touch.clientX,
+          y: touch.clientY,
+          index: hitMediaIndexRef.current(touch.clientX, touch.clientY) ?? hoverIndexRef.current,
+        };
+        pointerMovedRef.current = false;
+      } else {
+        pointerStartRef.current = null;
+        pointerMovedRef.current = true;
+      }
     };
 
     const onTouchMove = (e: TouchEvent) => {
+      if (isLightboxOpen()) return;
       e.preventDefault();
       e.stopPropagation();
       const touches = Array.from(e.touches) as Touch[];
@@ -390,10 +529,12 @@ function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onT
         const [last] = s.lastTouches;
 
         if (touch && last) {
+          markMoved(touch.clientX, touch.clientY);
           s.targetVel.x -= (touch.clientX - last.clientX) * 0.02;
           s.targetVel.y += (touch.clientY - last.clientY) * 0.02;
         }
       } else if (touches.length === 2 && s.lastTouchDist > 0) {
+        pointerMovedRef.current = true;
         const dist = getTouchDistance(touches);
         s.scrollAccum += (s.lastTouchDist - dist) * 0.006;
         s.lastTouchDist = dist;
@@ -406,7 +547,9 @@ function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onT
       e.stopPropagation();
       s.lastTouches = Array.from(e.touches) as Touch[];
       s.lastTouchDist = getTouchDistance(s.lastTouches);
-      setCursor("grab");
+      if (e.touches.length === 0) {
+        trySelect();
+      }
     };
 
     canvas.addEventListener("mousedown", onMouseDown);
@@ -428,9 +571,11 @@ function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onT
       canvas.removeEventListener("touchmove", onTouchMove);
       canvas.removeEventListener("touchend", onTouchEnd);
     };
-  }, [gl]);
+  }, [gl, setWrapperCursor, syncCursor]);
 
   useFrame(() => {
+    if (isLightboxOpen()) return;
+
     const s = state.current;
     const now = performance.now();
 
@@ -525,7 +670,15 @@ function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onT
   return (
     <>
       {chunks.map((chunk) => (
-        <Chunk key={chunk.key} cx={chunk.cx} cy={chunk.cy} cz={chunk.cz} media={media} cameraGridRef={cameraGridRef} />
+        <Chunk
+          key={chunk.key}
+          cx={chunk.cx}
+          cy={chunk.cy}
+          cz={chunk.cz}
+          media={media}
+          cameraGridRef={cameraGridRef}
+          onHoverChange={onHoverChange}
+        />
       ))}
     </>
   );
@@ -533,6 +686,7 @@ function SceneController({ media, onTextureProgress }: { media: MediaItem[]; onT
 
 export function InfiniteCanvasScene({
   media,
+  onMediaSelect,
   onTextureProgress,
   showFps = false,
   showControls = false,
@@ -556,7 +710,7 @@ export function InfiniteCanvasScene({
 
   return (
     <KeyboardControls map={KEYBOARD_MAP}>
-      <div className="infinite-canvas" data-infinite-canvas="">
+      <div className="infinite-canvas" data-infinite-canvas="" data-cursor="grab">
         <Canvas
           camera={{ position: [0, 0, INITIAL_CAMERA_Z], fov: cameraFov, near: cameraNear, far: cameraFar }}
           dpr={dpr}
@@ -566,7 +720,11 @@ export function InfiniteCanvasScene({
         >
           <color attach="background" args={[backgroundColor]} />
           <fog attach="fog" args={[fogColor, fogNear, fogFar]} />
-          <SceneController media={media} onTextureProgress={onTextureProgress} />
+          <SceneController
+            media={media}
+            onMediaSelect={onMediaSelect}
+            onTextureProgress={onTextureProgress}
+          />
           {showFps ? <Stats className="infinite-canvas__stats" /> : null}
         </Canvas>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Search, Trash2, Upload, X } from "lucide-react";
+import { Eye, Loader2, Search, Trash2, Upload, X } from "lucide-react";
 import { useMediaDrawer } from "@/components/admin/media-drawer-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,10 @@ import {
   uploadMediaFile,
 } from "@/lib/upload-media-file";
 import { cn } from "@/lib/utils";
+
+type PreviewTarget =
+  | { kind: "library"; id: string }
+  | { kind: "pending"; id: string };
 
 type PendingUpload = {
   id: string;
@@ -93,6 +97,8 @@ export function AdminMediaDrawer() {
   const [error, setError] = useState<string | null>(null);
   const [conflictIds, setConflictIds] = useState<Set<string>>(() => new Set());
   const [dragging, setDragging] = useState(false);
+  const [fullScreen, setFullScreen] = useState(false);
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [pickerSelection, setPickerSelection] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const {
@@ -126,6 +132,8 @@ export function AdminMediaDrawer() {
     setError(null);
     setConflictIds(new Set());
     setPickerSelection([]);
+    setFullScreen(false);
+    setPreview(null);
   }, [open]);
 
   useEffect(() => {
@@ -200,6 +208,9 @@ export function AdminMediaDrawer() {
     if (removed) URL.revokeObjectURL(removed.previewUrl);
 
     const next = pending.filter((item) => item.id !== id);
+    setPreview((prev) =>
+      prev?.kind === "pending" && prev.id === id ? null : prev,
+    );
     const nextSeed = seedId === id ? null : seedId;
     const seed = nextSeed
       ? next.find((item) => item.id === nextSeed)
@@ -330,6 +341,9 @@ export function AdminMediaDrawer() {
         throw new Error(result.error || "Xóa thất bại");
       }
       removeItem(item.id);
+      setPreview((prev) =>
+        prev?.kind === "library" && prev.id === item.id ? null : prev,
+      );
       window.dispatchEvent(new Event("admin-media-changed"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xóa thất bại");
@@ -341,9 +355,34 @@ export function AdminMediaDrawer() {
   const visibleMedia =
     accept === "image" ? media.filter((item) => item.type === "image") : media;
 
+  const previewView = (() => {
+    if (!preview) return null;
+    if (preview.kind === "library") {
+      const item = visibleMedia.find((entry) => entry.id === preview.id);
+      if (!item) return null;
+      return {
+        url: item.url,
+        alt: displayTitle(item),
+        isImage: item.type === "image",
+      };
+    }
+    const item = pending.find((entry) => entry.id === preview.id);
+    if (!item) return null;
+    return {
+      url: item.previewUrl,
+      alt: item.file.name,
+      isImage: item.file.type.startsWith("image/"),
+    };
+  })();
+
+  const togglePreview = (target: PreviewTarget) => {
+    setPreview((prev) =>
+      prev?.kind === target.kind && prev.id === target.id ? null : target,
+    );
+  };
+
   const multiPickerMode = pickMode === "multiple";
   const singlePickerMode = pickMode === "single";
-  const pickerMode = multiPickerMode || singlePickerMode;
   const titlesReady =
     pending.length > 0 && pending.every((item) => item.title.trim());
 
@@ -383,7 +422,13 @@ export function AdminMediaDrawer() {
   };
 
   return (
-    <Sheet open={open} onOpenChange={(next) => !next && closeMedia()} title="Media">
+    <Sheet
+      open={open}
+      onOpenChange={(next) => !next && closeMedia()}
+      title="Media"
+      fullScreen={fullScreen}
+      onToggleFullScreen={() => setFullScreen((prev) => !prev)}
+    >
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="space-y-4 border-b px-4 py-4">
           {singlePickerMode && (
@@ -403,6 +448,52 @@ export function AdminMediaDrawer() {
             </div>
           )}
 
+          <input
+            ref={inputRef}
+            type="file"
+            accept={
+              accept === "image"
+                ? "image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                : "image/jpeg,image/png,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime"
+            }
+            multiple
+            className="hidden"
+            onChange={(e) => queueFiles(e.target.files)}
+          />
+          {previewView ? (
+            <div className="relative mx-auto w-fit max-w-full">
+              {previewView.isImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewView.url}
+                  alt={previewView.alt}
+                  className={cn(
+                    "block max-w-full object-contain",
+                    fullScreen ? "max-h-[min(60vh,36rem)]" : "max-h-64",
+                  )}
+                />
+              ) : (
+                <video
+                  src={previewView.url}
+                  className={cn(
+                    "block max-w-full object-contain",
+                    fullScreen ? "max-h-[min(60vh,36rem)]" : "max-h-64",
+                  )}
+                  controls
+                />
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="absolute right-2 top-2 h-8 w-8"
+                onClick={() => setPreview(null)}
+                aria-label="Đóng xem trước"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
           <div
             className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
               dragging ? "border-primary bg-muted/50" : "border-input"
@@ -421,20 +512,9 @@ export function AdminMediaDrawer() {
             <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
             <p className="text-sm font-medium">Kéo thả hoặc chọn file</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Chọn file, nhập title, rồi Upload. JPEG/PNG/WebP tối đa 50MB (server nén). SVG 10MB, video 100MB.
+              Chọn file, nhập title, rồi Upload. JPEG/PNG/WebP tối đa 50MB
+              (server nén). SVG 10MB, video 100MB.
             </p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept={
-                accept === "image"
-                  ? "image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-                  : "image/jpeg,image/png,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime"
-              }
-              multiple
-              className="hidden"
-              onChange={(e) => queueFiles(e.target.files)}
-            />
             <Button
               type="button"
               size="sm"
@@ -445,16 +525,29 @@ export function AdminMediaDrawer() {
               Chọn file
             </Button>
           </div>
+          )}
 
           {pending.length > 0 && (
             <div className="space-y-3">
               <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                {pending.map((item, index) => (
+                {pending.map((item, index) => {
+                  const isPreviewing =
+                    preview?.kind === "pending" && preview.id === item.id;
+                  return (
                   <li
                     key={item.id}
-                    className="flex gap-3 rounded-lg border p-2"
+                    className={cn(
+                      "flex gap-3 rounded-lg border p-2",
+                      isPreviewing && "border-primary",
+                    )}
                   >
-                    <div className="h-16 w-20 shrink-0 overflow-hidden rounded bg-muted">
+                    <button
+                      type="button"
+                      className="h-16 w-20 shrink-0 cursor-pointer overflow-hidden rounded bg-muted"
+                      onClick={() =>
+                        togglePreview({ kind: "pending", id: item.id })
+                      }
+                    >
                       {item.file.type.startsWith("image/") ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -469,7 +562,7 @@ export function AdminMediaDrawer() {
                           muted
                         />
                       )}
-                    </div>
+                    </button>
                     <div className="min-w-0 flex-1 space-y-1">
                       <p className="truncate text-xs text-muted-foreground">
                         {item.file.name} · {formatSize(item.file.size)}
@@ -498,19 +591,38 @@ export function AdminMediaDrawer() {
                         }
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0"
-                      onClick={() => removePending(item.id)}
-                      disabled={uploading}
-                      aria-label={`Gỡ ${item.file.name} khỏi hàng đợi`}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      <Button
+                        type="button"
+                        variant={isPreviewing ? "secondary" : "ghost"}
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() =>
+                          togglePreview({ kind: "pending", id: item.id })
+                        }
+                        aria-label={
+                          isPreviewing
+                            ? `Đóng xem ${item.file.name}`
+                            : `Xem ${item.file.name}`
+                        }
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => removePending(item.id)}
+                        disabled={uploading}
+                        aria-label={`Gỡ ${item.file.name} khỏi hàng đợi`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
               <Button
                 type="button"
@@ -606,6 +718,8 @@ export function AdminMediaDrawer() {
                 {visibleMedia.map((item) => {
                 const isSelected =
                   multiPickerMode && pickerSelection.includes(item.url);
+                const isPreviewing =
+                  preview?.kind === "library" && preview.id === item.id;
 
                 return (
                   <li
@@ -613,23 +727,24 @@ export function AdminMediaDrawer() {
                     className={cn(
                       "flex gap-3 rounded-lg border p-2",
                       isSelected && "border-primary bg-primary/5",
+                      isPreviewing && "border-primary",
                     )}
                   >
                     <button
                       type="button"
-                      className={cn(
-                        "h-16 w-20 shrink-0 overflow-hidden rounded bg-muted",
-                        pickerMode ? "cursor-pointer" : "cursor-default",
-                      )}
-                      disabled={!pickerMode}
+                      className="h-16 w-20 shrink-0 cursor-pointer overflow-hidden rounded bg-muted"
                       onClick={() => {
                         if (multiPickerMode) {
                           togglePickerSelection(item.url);
                           return;
                         }
-                        if (!onPick) return;
-                        onPick(item);
-                        closeMedia();
+                        if (singlePickerMode) {
+                          if (!onPick) return;
+                          onPick(item);
+                          closeMedia();
+                          return;
+                        }
+                        togglePreview({ kind: "library", id: item.id });
                       }}
                     >
                       {item.type === "image" ? (
@@ -682,21 +797,39 @@ export function AdminMediaDrawer() {
                         </Button>
                       )}
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                      onClick={() => void handleDelete(item)}
-                      disabled={deletingId === item.id}
-                      aria-label={`Xóa ${displayTitle(item)}`}
-                    >
-                      {deletingId === item.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      <Button
+                        type="button"
+                        variant={isPreviewing ? "secondary" : "ghost"}
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() =>
+                          togglePreview({ kind: "library", id: item.id })
+                        }
+                        aria-label={
+                          isPreviewing
+                            ? `Đóng xem ${displayTitle(item)}`
+                            : `Xem ${displayTitle(item)}`
+                        }
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => void handleDelete(item)}
+                        disabled={deletingId === item.id}
+                        aria-label={`Xóa ${displayTitle(item)}`}
+                      >
+                        {deletingId === item.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </li>
                 );
               })}

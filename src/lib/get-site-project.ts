@@ -42,6 +42,7 @@ export const getSiteProjectBySlug = cache(
 
 export async function getRelatedSiteProjects(
   project: SiteProject,
+  limit = 20,
 ): Promise<SiteProject[]> {
   try {
     const rows = await prisma.post.findMany({
@@ -58,13 +59,13 @@ export async function getRelatedSiteProjects(
       const rest = mapped.filter(
         (entry) => entry.category !== project.category,
       );
-      return [...same, ...rest];
+      return [...same, ...rest].slice(0, limit);
     }
   } catch {
     // fallback hardcode
   }
 
-  return getRelatedProjects(project.slug);
+  return getRelatedProjects(project.slug, limit);
 }
 
 export async function getPublishedProjectSlugs(): Promise<string[]> {

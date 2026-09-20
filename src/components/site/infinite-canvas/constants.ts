@@ -13,6 +13,8 @@ export const KEYBOARD_SPEED = 0.18;
 export const VELOCITY_LERP = 0.16;
 export const VELOCITY_DECAY = 0.9;
 export const INITIAL_CAMERA_Z = 50;
+/** Click vs pan trên canvas — dưới ngưỡng thì mở lightbox. */
+export const SELECT_SLOP_PX = 8;
 
 export type ChunkOffset = {
   dx: number;

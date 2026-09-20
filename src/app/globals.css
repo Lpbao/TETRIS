@@ -1528,6 +1528,11 @@ html:has(#hero-carousel) body {
   color: var(--brand-red);
 }
 
+.mobile-menu-links a:focus,
+.mobile-menu-links a:focus-visible {
+  outline: none;
+}
+
 .mobile-menu-links li {
   opacity: 0;
   transform: translateY(0.5rem);
@@ -1835,7 +1840,6 @@ ul:has(.project-card-hover-scale) {
 }
 
 /* LAYOUT2 — canvas fills pager panel (viewport đã trừ header) */
-[data-project-detail-layout2] .project-detail-cover,
 .project-detail-images-layout2 {
   height: 100%;
   min-height: 100%;
@@ -1850,32 +1854,92 @@ ul:has(.project-card-hover-scale) {
 
 .project-detail-layout2-nav {
   position: absolute;
-  top: 50%;
-  right: 12px;
+  right: var(--site-header-pad-inline);
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  transform: translateY(-50%);
 }
 
-.project-detail-layout2-nav__btn {
+.project-detail-layout2-nav__btn--down {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 56px;
+  padding: 0;
   border: 0;
-  border-radius: 8px;
-  background-color: rgb(255 255 255 / 0.92);
-  color: var(--brand-black);
-  box-shadow: 0 0 10px 0 rgb(0 0 0 / 0.1);
+  background: none;
+  box-shadow: none;
   cursor: pointer;
   touch-action: manipulation;
 }
 
-.project-detail-layout2-nav__btn:hover {
-  background-color: rgb(255 255 255);
+.project-detail-layout2-nav__btn--down:hover,
+.project-detail-layout2-nav__btn--down:focus-visible {
+  background: none;
+  box-shadow: none;
+  outline: none;
+}
+
+.project-detail-layout2-nav__arrow {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.project-detail-layout2-nav__chevron {
+  fill: none;
+  stroke: var(--brand-red);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.project-detail-layout2-nav__chevron--1 {
+  opacity: 0.35;
+}
+
+.project-detail-layout2-nav__chevron--2 {
+  opacity: 0.65;
+}
+
+.project-detail-layout2-nav__chevron--3 {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .project-detail-layout2-nav__chevron {
+    animation: layout2-arrow-scroll 1.4s ease-in-out infinite;
+  }
+
+  .project-detail-layout2-nav__chevron--1 {
+    animation-delay: 0s;
+  }
+
+  .project-detail-layout2-nav__chevron--2 {
+    animation-delay: 0.18s;
+  }
+
+  .project-detail-layout2-nav__chevron--3 {
+    animation-delay: 0.36s;
+  }
+}
+
+@keyframes layout2-arrow-scroll {
+  0%,
+  100% {
+    opacity: 0.18;
+    transform: translateY(-2px);
+  }
+
+  35% {
+    opacity: 1;
+    transform: translateY(2px);
+  }
 }
 
 .infinite-canvas {
@@ -1884,6 +1948,21 @@ ul:has(.project-card-hover-scale) {
   position: absolute;
   inset: 0;
   touch-action: none;
+  cursor: grab;
+}
+
+.infinite-canvas canvas {
+  cursor: inherit;
+}
+
+.infinite-canvas[data-cursor="grabbing"],
+.infinite-canvas[data-cursor="grabbing"] canvas {
+  cursor: grabbing;
+}
+
+.infinite-canvas[data-cursor="eye"],
+.infinite-canvas[data-cursor="eye"] canvas {
+  cursor: url("/cursors/eye.svg") 16 16, pointer;
 }
 
 .infinite-canvas__canvas {
@@ -1998,10 +2077,49 @@ ul:has(.project-card-hover-scale) {
   width: 100%;
 }
 
+.project-detail-images-default__trigger {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: url("/cursors/eye.svg") 16 16, pointer;
+  color: inherit;
+}
+
+.project-detail-images-default__trigger:focus,
+.project-detail-images-default__trigger:focus-visible {
+  outline: none;
+}
+
 .project-detail-images-default__img {
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* Desktop: full content width; cap height so portrait fits viewport */
+@media (min-width: 1024px) {
+  .project-detail-images-default__item {
+    display: flex;
+    justify-content: center;
+  }
+
+  .project-detail-images-default__trigger,
+  .project-detail-images-default__trigger > span {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .project-detail-images-default .project-detail-images-default__img {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 70vh;
+    object-fit: contain;
+    object-position: center;
+  }
 }
 
 .project-detail-images__veil {
@@ -2228,17 +2346,44 @@ html[data-lightbox-open] .site-header {
   color: #fff;
 }
 
-.project-detail-lightbox__close:hover,
 .project-detail-lightbox__nav:hover {
   color: #fff;
   background: rgb(255 255 255 / 12%);
 }
 
 .project-detail-lightbox__close {
-  top: calc(max(0.75rem, env(safe-area-inset-top)) + 30px);
-  right: max(0.75rem, env(safe-area-inset-right));
+  top: calc(var(--site-header-safe-top) + var(--site-header-pad-top));
+  right: var(--site-header-pad-inline);
+  width: auto;
+  height: auto;
+  min-width: var(--site-header-menu-size);
+  min-height: var(--site-header-menu-size);
+  padding: 0.5rem;
+  background: #7a1f27;
   color: #fff !important;
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+.project-detail-lightbox__close:hover,
+.project-detail-lightbox__close:focus-visible {
+  background: #7a1f27;
+  color: #fff;
   opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-detail-lightbox__close {
+    transition: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .project-detail-lightbox__close {
+    top: auto;
+    bottom: max(1.25rem, env(safe-area-inset-bottom));
+    right: var(--site-header-pad-inline);
+  }
 }
 
 .project-detail-lightbox__nav--prev {
@@ -2253,11 +2398,11 @@ html[data-lightbox-open] .site-header {
   transform: translateY(-50%);
 }
 
-/* Related: 3×3 mobile, 7×5 desktop — animation Codrops grid--full
+/* Related: ≤3×3 mobile (unique), ≤5×4 desktop (max 20, no duplicate pad)
    https://github.com/codrops/Staggered3DGridAnimations */
 .project-detail-related {
-  --grid-columns-full: 3;
-  --grid-rows-full: 3;
+  --grid-columns-full: var(--related-cols-mobile, 3);
+  --grid-rows-full: var(--related-rows-mobile, 3);
   --grid-gap: 0.75rem;
   --grid-item-ratio: auto;
   --grid-item-radius: 4px;
@@ -2343,35 +2488,13 @@ html[data-lightbox-open] .site-header {
   display: none;
 }
 
-@media (min-width: 1024px) {
-  .project-detail-related {
-    --grid-columns-full: 7;
-    --grid-rows-full: 5;
-    --grid-gap: 1rem;
-  }
-
-  .project-detail-related .grid--full {
-    aspect-ratio: 1.5;
-  }
-
-  .project-detail-related .grid__item:nth-child(n + 10) {
-    display: block;
-  }
-
-  .project-detail-related::before {
-    background: linear-gradient(
-      to right,
-      var(--background),
-      transparent,
-      var(--background)
-    );
-  }
-}
-
 .project-detail-related .grid__item > a {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  border-radius: var(--grid-item-radius);
 }
 
 .project-detail-related .grid__item-img,
@@ -2389,6 +2512,101 @@ html[data-lightbox-open] .site-header {
   backface-visibility: hidden;
   transform-style: preserve-3d;
   will-change: transform;
+}
+
+/* Mobile / default: a11y-only — desktop caption overrides below */
+.project-detail-related .grid__item-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 1024px) {
+  .project-detail-related {
+    --grid-columns-full: var(--related-cols-desktop, 5);
+    --grid-rows-full: var(--related-rows-desktop, 4);
+    --grid-gap: 1.75rem;
+  }
+
+  .project-detail-related .grid--full {
+    aspect-ratio: var(--related-aspect-desktop, 5 / 4);
+    padding: var(--grid-gap) 1.5rem;
+  }
+
+  .project-detail-related .grid__item:nth-child(n + 10) {
+    display: block;
+  }
+
+  .project-detail-related .grid__item:hover,
+  .project-detail-related .grid__item:focus-within {
+    z-index: 6;
+  }
+
+  .project-detail-related::before {
+    background: linear-gradient(
+      to right,
+      var(--background),
+      transparent,
+      var(--background)
+    );
+  }
+
+  .project-detail-related .grid__item-title {
+    inset: auto 0 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 1.35rem 0.55rem 0.7rem;
+    overflow: hidden;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+    border: 0;
+    border-radius: 0 0 var(--grid-item-radius) var(--grid-item-radius);
+    background: linear-gradient(
+      to top,
+      rgb(35 31 32 / 0.78) 0%,
+      rgb(35 31 32 / 0) 100%
+    );
+    font-family: var(--font-ui);
+    font-size: clamp(0.65rem, 0.9vw, 0.8rem);
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+    color: var(--brand-white);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .project-detail-related .grid__item > a:hover .grid__item-title,
+  .project-detail-related .grid__item > a:focus-visible .grid__item-title,
+  .project-detail-related .grid__item:hover .grid__item-title,
+  .project-detail-related .grid__item:focus-within .grid__item-title {
+    opacity: 1;
+  }
+}
+
+@media (min-width: 1024px) and (prefers-reduced-motion: reduce) {
+  .project-detail-related .grid__item-title {
+    transition: none;
+  }
 }
 
 /* Room to reach ScrollTrigger `end: center center` (Codrops `.credits` 50vh) */

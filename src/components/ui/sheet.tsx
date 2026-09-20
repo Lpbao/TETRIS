@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { Maximize2, Minimize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,12 +12,16 @@ export function Sheet({
   side = "left",
   title,
   children,
+  fullScreen = false,
+  onToggleFullScreen,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   side?: "left" | "right";
   title: string;
   children: React.ReactNode;
+  fullScreen?: boolean;
+  onToggleFullScreen?: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -56,6 +60,7 @@ export function Sheet({
         className={cn(
           "absolute inset-0 bg-black/50 transition-opacity duration-200",
           open ? "opacity-100" : "opacity-0",
+          fullScreen && "opacity-0",
         )}
         onClick={() => onOpenChange(false)}
       />
@@ -64,26 +69,51 @@ export function Sheet({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "absolute inset-y-0 flex w-full max-w-md flex-col bg-background shadow-xl transition-transform duration-200",
-          side === "left" ? "left-0" : "right-0",
+          "absolute flex flex-col bg-background shadow-xl transition-[transform,inset,width,max-width] duration-200",
+          fullScreen
+            ? "inset-0 w-full max-w-none"
+            : cn(
+                "inset-y-0 w-full max-w-md",
+                side === "left" ? "left-0" : "right-0",
+              ),
           open
             ? "translate-x-0"
-            : side === "left"
+            : !fullScreen && side === "left"
               ? "-translate-x-full"
-              : "translate-x-full",
+              : !fullScreen
+                ? "translate-x-full"
+                : "translate-x-0",
+          !open && fullScreen && "pointer-events-none opacity-0",
         )}
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenChange(false)}
-            aria-label="Đóng media"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {onToggleFullScreen ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onToggleFullScreen}
+                aria-label={fullScreen ? "Thu nhỏ" : "Toàn màn hình"}
+              >
+                {fullScreen ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+              aria-label="Đóng media"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>

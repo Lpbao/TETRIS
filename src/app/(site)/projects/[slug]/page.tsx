@@ -71,7 +71,6 @@ export default async function ProjectDetailPage({
     return (
       <ProjectDetailLayout2Scroll
         title={project.title}
-        coverSrc={getProjectCover(project)}
         concept={project.categoryLabel}
         address={project.location}
         description={project.description ?? ""}
@@ -94,12 +93,14 @@ export default async function ProjectDetailPage({
 
   return (
     <article data-project-detail>
-      <ProjectDetailCover
-        title={project.title}
-        src={getProjectCover(project)}
-        concept={project.categoryLabel}
-        address={project.location}
-      />
+      {layoutStyle === "LAYOUT1" ? (
+        <ProjectDetailCover
+          title={project.title}
+          src={getProjectCover(project)}
+          concept={project.categoryLabel}
+          address={project.location}
+        />
+      ) : null}
 
       {gallery}
 

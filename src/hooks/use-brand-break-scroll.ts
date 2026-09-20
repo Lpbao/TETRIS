@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMorphPinScroll } from "@/hooks/use-morph-pin-scroll";
 import { useFullPageScroll } from "@/lib/full-page-scroll/context";
 import { getHeaderOffset } from "@/lib/home-scroll";
@@ -29,12 +29,6 @@ function readCssTimeMs(
   const value = Number.parseFloat(raw);
   if (!Number.isFinite(value)) return fallbackMs;
   return raw.endsWith("ms") ? value : value * 1000;
-}
-
-function readCssNumber(root: Element, name: string, fallback: number): number {
-  const raw = getComputedStyle(root).getPropertyValue(name).trim();
-  const value = Number.parseFloat(raw);
-  return Number.isFinite(value) ? value : fallback;
 }
 
 function isCoarsePointer(): boolean {
@@ -126,36 +120,6 @@ function isBrandBreakImageReady(root: HTMLElement): boolean {
   return false;
 }
 
-/** Sync token collapse — không ghi height inline (đánh nhau morph → giật). */
-function ensureBrandBreakScrollRoom(root: HTMLElement) {
-  const scroller = root.closest("[data-fps-inner-scroll]");
-  const track = root.querySelector("[data-morph-pin-track]");
-  if (!(scroller instanceof HTMLElement)) return;
-  const vvh = Math.max(scroller.clientHeight, 1);
-  const targetPx = readCssNumber(root, "--brand-break-letter-px", 200);
-  const minR = readCssNumber(root, "--brand-break-letter-ratio-min", 0.16);
-  const maxR = readCssNumber(root, "--brand-break-letter-ratio-max", 0.28);
-  let letterRatio = targetPx / vvh;
-  if (letterRatio < minR) letterRatio = minR;
-  if (letterRatio > maxR) letterRatio = maxR;
-  const imageRatio = Math.max(
-    0.01,
-    readCssNumber(root, "--morph-pin-image-ratio", 1),
-  );
-  const alignSpeed = Math.max(
-    0.01,
-    readCssNumber(root, "--morph-pin-align-speed", 1.35),
-  );
-  const collapse = vvh * (letterRatio + imageRatio / alignSpeed);
-  root.style.setProperty("--morph-pin-vvh", `${Math.round(vvh)}px`);
-  root.style.setProperty("--morph-pin-collapse", `${Math.round(collapse)}px`);
-  root.style.setProperty("--morph-pin-letter-ratio-used", String(letterRatio));
-  if (track instanceof HTMLElement) {
-    track.style.removeProperty("height");
-    track.style.removeProperty("min-height");
-  }
-}
-
 export function useBrandBreakScroll() {
   return useMorphPinScroll(SECTION_ID);
 }
@@ -228,8 +192,6 @@ export function useBrandBreakLogoEnter(
     const finishRest = () => {
       if (cancelled) return;
       applyBlockShifts(root, 1, 1, 1);
-      clearBlockInlineTransforms(root);
-      ensureBrandBreakScrollRoom(root);
       setPhase("rest");
     };
 
@@ -255,7 +217,6 @@ export function useBrandBreakLogoEnter(
       startedRef.current = true;
       window.clearTimeout(fallbackTimer);
       applyBlockShifts(root, 0, 0, 0);
-      ensureBrandBreakScrollRoom(root);
 
       if (getPrefersReducedMotion()) {
         finishRest();
@@ -289,6 +250,13 @@ export function useBrandBreakLogoEnter(
       }
     };
   }, [leftStage, onStage, rootRef]);
+
+  /* rest đã commit trên DOM rồi mới bỏ inline — tránh 1 frame CSS 100vw. */
+  useLayoutEffect(() => {
+    if (phase !== "rest") return;
+    const root = rootRef.current;
+    if (root) clearBlockInlineTransforms(root);
+  }, [phase, rootRef]);
 
   /* Cuộn về đỉnh ảnh: gắn lại khối ở đích (CSS rest), face theo --morph-pin-letter-x. */
   useEffect(() => {

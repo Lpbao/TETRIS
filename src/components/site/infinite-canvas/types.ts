@@ -10,6 +10,8 @@ export type MediaItem = {
 
 export type InfiniteCanvasProps = {
   media: MediaItem[];
+  /** Click/tap một plane (không pan) — index trong `media`. */
+  onMediaSelect?: (index: number) => void;
   onTextureProgress?: (progress: number) => void;
   showFps?: boolean;
   showControls?: boolean;

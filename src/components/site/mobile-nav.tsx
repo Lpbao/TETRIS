@@ -300,8 +300,8 @@ export function MobileNav({
   }, [menuExpanded, closeMenu]);
 
   useEffect(() => {
-    if (phase !== "open" || !panelRef.current) return;
-    panelRef.current.querySelector<HTMLElement>("a[href]")?.focus();
+    if (phase !== "open") return;
+    closeToggleRef.current?.focus();
   }, [phase]);
 
   useEffect(() => {

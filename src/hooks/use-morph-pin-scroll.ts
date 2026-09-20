@@ -74,6 +74,17 @@ function letterExitPx(progress: number, vw: number): string {
   return `${(Math.round(-progress * vw * 10) / 10).toFixed(1)}px`;
 }
 
+/** Brand-break: logo rest + đã rời đỉnh mới nhả letter-exit. */
+const BRAND_BREAK_LETTER_ARM_PX = 12;
+
+function brandBreakLetterArmed(root: HTMLElement, scrollTop: number): boolean {
+  if (!root.hasAttribute("data-brand-break")) return true;
+  return (
+    root.getAttribute("data-brand-break-logo") === "rest" &&
+    scrollTop > BRAND_BREAK_LETTER_ARM_PX
+  );
+}
+
 /** Đáy photo đã paint (object-contain), không phải đáy khung wrapper. */
 function measureVisualImageBottom(wrapper: HTMLElement): number {
   const img = wrapper.querySelector("img");
@@ -268,14 +279,19 @@ export function useMorphPinScroll(sectionId: string) {
         setCssVar(root, "--morph-pin-vvh", `${vvh}px`);
         setCssVar(root, "--morph-pin-collapse", `${alignUnstick}px`);
         void scroller.offsetHeight;
-        remapScrollTopForVvhChange(
-          scroller,
-          prevMeasuredVvh,
-          vvh,
-          letterRatio,
-          imageRatio,
-          alignSpeed,
-        );
+        const nearLetterHome =
+          root.hasAttribute("data-brand-break") &&
+          scroller.scrollTop <= letterDist;
+        if (!touching && !nearLetterHome) {
+          remapScrollTopForVvhChange(
+            scroller,
+            prevMeasuredVvh,
+            vvh,
+            letterRatio,
+            imageRatio,
+            alignSpeed,
+          );
+        }
         frozenShiftRef.current = null;
         targetShiftRef.current = null;
         lastMeasureProgressRef.current = { pShrink: -1, pAlign: -1 };
@@ -286,12 +302,15 @@ export function useMorphPinScroll(sectionId: string) {
       }
 
       const scrollTop = scroller.scrollTop;
+      const morphScrollTop = brandBreakLetterArmed(root, scrollTop)
+        ? scrollTop
+        : 0;
 
-      const pLetter = letterDist > 0 ? clamp01(scrollTop / letterDist) : 1;
+      const pLetter = letterDist > 0 ? clamp01(morphScrollTop / letterDist) : 1;
       const lettersOut = pLetter >= 1;
       let pImage =
         lettersOut && imageDist > 0
-          ? clamp01((scrollTop - letterDist) / imageDist)
+          ? clamp01((morphScrollTop - letterDist) / imageDist)
           : 0;
       let pShrink = lettersOut ? clamp01(pImage * shrinkSpeed) : 0;
       let pTop = lettersOut ? clamp01(pImage * topSpeed) : 0;
